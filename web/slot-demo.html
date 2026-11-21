@@ -125,7 +125,8 @@
 
   .curtain p { margin: 0; color: var(--ink-dim); font-size: 0.9rem; }
 
-  .fullscreen {
+  .fullscreen,
+  .sound {
     position: absolute;
     left: 10px;
     top: 10px;
@@ -143,13 +144,21 @@
     transition: opacity 120ms ease, border-color 120ms ease;
   }
 
-  .fullscreen svg { display: block; width: 28px; height: 28px; }
+  .sound { left: 64px; }
+
+  .fullscreen svg,
+  .sound svg { display: block; width: 28px; height: 28px; }
 
   .fullscreen:hover,
-  .fullscreen:focus-visible {
+  .fullscreen:focus-visible,
+  .sound:hover,
+  .sound:focus-visible {
     opacity: 1;
     border-color: var(--gold);
   }
+
+  /* Sound starts off, so the button advertises itself until it is switched on. */
+  .sound[aria-pressed="false"] { opacity: 0.85; }
 
   .curtain .stage {
     font-family: var(--display);
@@ -306,6 +315,21 @@
         <path d="M14.6 18.8h4.2v-4.2"></path><path d="M18.8 18.8l-4.8-4.8"></path>
       </svg>
     </button>
+    <button class="sound" id="sound" type="button" title="Sound off"
+            aria-label="Sound off" aria-pressed="false" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z"></path>
+        <g id="sound-waves" hidden>
+          <path d="M16 9.2a4 4 0 0 1 0 5.6"></path>
+          <path d="M18.6 6.6a7.5 7.5 0 0 1 0 10.8"></path>
+        </g>
+        <g id="sound-cross">
+          <path d="M16.5 10l5 4"></path>
+          <path d="M21.5 10l-5 4"></path>
+        </g>
+      </svg>
+    </button>
   </div>
 
   <div class="columns">
@@ -398,6 +422,27 @@
       // Offered only once the player exists, and only where the browser will grant it:
       // some embedded views refuse fullscreen outright, and a button that silently does
       // nothing is worse than no button.
+      var sound = document.getElementById("sound");
+      var waves = document.getElementById("sound-waves");
+      var cross = document.getElementById("sound-cross");
+      var soundOn = false;
+
+      // The player starts silent: a page that makes noise before being asked is a
+      // nuisance, and browsers block audio until the page has been interacted with
+      // anyway, so the first press is both the permission and the switch.
+      sound.hidden = false;
+      sound.addEventListener("click", function () {
+        soundOn = !soundOn;
+
+        unityInstance.SendMessage("SlotMachine", "SetSoundEnabled", soundOn ? 1 : 0);
+
+        sound.setAttribute("aria-pressed", String(soundOn));
+        sound.title = soundOn ? "Sound on" : "Sound off";
+        sound.setAttribute("aria-label", sound.title);
+        waves.hidden = !soundOn;
+        cross.hidden = soundOn;
+      });
+
       var button = document.getElementById("fullscreen");
       if (!document.fullscreenEnabled) return;
 

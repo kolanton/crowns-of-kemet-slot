@@ -15,6 +15,7 @@ namespace EgyptianSlot
         [SerializeField] private Text _winLabel;
         [SerializeField] private CanvasGroup _bigWinBanner;
         [SerializeField] private Text _bigWinLabel;
+        [SerializeField] private SlotAudio _audio;
 
         [Header("Line cycling")]
         [Tooltip("Seconds each winning line is held before the next is shown.")]
@@ -74,6 +75,8 @@ namespace EgyptianSlot
                 engine.CellsForLineWin(win, _cells);
                 HighlightOnly(_cells, reels, config);
 
+                if (_audio != null) _audio.PlayWin();
+
                 if (_winLabel != null)
                 {
                     var symbol = config.Symbols[win.SymbolIndex];
@@ -92,6 +95,7 @@ namespace EgyptianSlot
         {
             if (_bigWinBanner == null) yield break;
 
+            if (_audio != null) _audio.PlayBigWin();
             if (_bigWinLabel != null) _bigWinLabel.text = text;
 
             const float fade = 0.25f;

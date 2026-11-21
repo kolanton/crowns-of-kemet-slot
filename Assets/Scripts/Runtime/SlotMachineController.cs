@@ -21,6 +21,7 @@ namespace EgyptianSlot
         [SerializeField] private ReelView[] _reels;
         [SerializeField] private SlotHud _hud;
         [SerializeField] private WinPresenter _winPresenter;
+        [SerializeField] private SlotAudio _audio;
 
         [Header("Spin feel")]
         [Tooltip("Cells the leftmost reel travels before it may stop.")]
@@ -119,6 +120,8 @@ namespace EgyptianSlot
             _isSpinning = true;
             _winPresenter.Clear();
 
+            if (_audio != null) _audio.PlaySpin();
+
             _balance -= TotalBet;
             _hud.Refresh();
 
@@ -166,6 +169,10 @@ namespace EgyptianSlot
             else { _autoplay = false; _hud.Refresh(); }
         }
 
-        private void OnReelStopped() => _reelsStillSpinning--;
+        private void OnReelStopped()
+        {
+            _reelsStillSpinning--;
+            if (_audio != null) _audio.PlayReelStop();
+        }
     }
 }

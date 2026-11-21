@@ -98,10 +98,19 @@ namespace EgyptianSlot.EditorTools
             var hud = CreateHud(canvas, catalog);
 
             var machine = new GameObject("SlotMachine").AddComponent<SlotMachineController>();
+
+            // Named "SlotMachine" because the hosting page addresses it by that name
+            // through SendMessage to toggle sound.
+            var audio = machine.gameObject.AddComponent<SlotAudio>();
+            WireAudio(audio);
+
             SetPrivateField(machine, "_config", config);
             SetPrivateField(machine, "_reels", reels);
             SetPrivateField(machine, "_hud", hud);
             SetPrivateField(machine, "_winPresenter", winPresenter);
+            SetPrivateField(machine, "_audio", audio);
+            SetPrivateField(hud, "_audio", audio);
+            SetPrivateField(winPresenter, "_audio", audio);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -536,15 +545,25 @@ namespace EgyptianSlot.EditorTools
             // the generated fallback plate is dark stone and wants the opposite.
             Color buttonCaption = packButton != null ? Carved : Gold;
 
-            var autoButton = NewPlateButton(barRect, "AutoPlay", 436f, 150f, "AUTO\nPLAY",
-                buttonPlate, out var autoLabel, buttonCaption);
-            var maxBetButton = NewPlateButton(barRect, "MaxBet", 712f, 150f, "MAX\nBET",
-                buttonPlate, out _, buttonCaption);
+            // The two action plates sit either side of the spin button and the disc drops
+            // into the gap between them, overlapping each slightly — the arrangement the
+            // pack's own mock-up uses.
+            const float buttonWidth = 152f;
+            const float buttonHeight = 72f;
+            const float discDiameter = 104f;
+
+            var autoButton = NewPlateButton(barRect, "AutoPlay", 524f, buttonWidth, buttonHeight,
+                "AUTO\nPLAY", buttonPlate, out var autoLabel, buttonCaption);
+            var maxBetButton = NewPlateButton(barRect, "MaxBet", 756f, buttonWidth, buttonHeight,
+                "MAX\nBET", buttonPlate, out _, buttonCaption, mirrored: packButton != null);
 
             NewPlate(barRect, "LineBet", 876f, 150f, "LINE BET", plate, out var lineBetValue);
             NewPlate(barRect, "Coins", 1040f, 204f, "COINS", plate, out var balanceValue);
 
-            var spinButton = NewDisc(barRect, "Spin", 112f, disc, out var spinImage, out var spinLabel);
+            // Added last so it draws over both plates, and lifted so it rides above the
+            // line of the bar rather than sitting flush with it.
+            var spinButton = NewDisc(barRect, "Spin", discDiameter, disc,
+                out var spinImage, out var spinLabel, riseY: 12f);
 
             // The pack's spin button is painted with its own symbol, so a caption over it
             // would only compete with the art.
@@ -552,7 +571,8 @@ namespace EgyptianSlot.EditorTools
 
             // Reset has no counterpart in the pack's mock-up, so it sits out of the bar
             // rather than crowding a layout the background art was composed around.
-            var resetButton = NewPlateButton(canvas.transform, "Reset", 0f, 112f, "RESET", plate, out _);
+            var resetButton = NewPlateButton(canvas.transform, "Reset", 0f, 112f, 54f, "RESET",
+                plate, out _);
             var resetRect = (RectTransform)resetButton.transform;
             resetRect.anchorMin = resetRect.anchorMax = new Vector2(1f, 1f);
             resetRect.pivot = new Vector2(1f, 1f);
@@ -586,6 +606,34 @@ namespace EgyptianSlot.EditorTools
             SetPrivateField(hud, "_spinPressedSprite", packSpinPressed);
 
             return hud;
+        }
+
+        /// <summary>
+        /// Fills the audio component from the imported sound pack. Absent the pack, every
+        /// event simply has no clips and the machine runs silently.
+        /// </summary>
+        private static void WireAudio(SlotAudio audio)
+        {
+            var clips = SlotAudioCatalog.Build();
+
+            if (clips.Count == 0)
+            {
+                Debug.LogWarning("[SlotSceneBuilder] No sound pack found; the demo will be silent.");
+                return;
+            }
+
+            SetPrivateField(audio, "_spin", SlotAudioCatalog.For(clips, "spin"));
+            SetPrivateField(audio, "_reelStop", SlotAudioCatalog.For(clips, "reelStop"));
+            SetPrivateField(audio, "_win", SlotAudioCatalog.For(clips, "win"));
+            SetPrivateField(audio, "_bigWin", SlotAudioCatalog.For(clips, "bigWin"));
+            SetPrivateField(audio, "_click", SlotAudioCatalog.For(clips, "click"));
+
+            var source = audio.gameObject.AddComponent<AudioSource>();
+            source.playOnAwake = false;
+            SetPrivateField(audio, "_source", source);
+
+            Debug.Log("[SlotSceneBuilder] Audio wired: " +
+                      string.Join(", ", clips.Select(pair => $"{pair.Key}={pair.Value.Count}")));
         }
 
         private static void AddSceneToBuildSettings()
@@ -635,17 +683,22 @@ namespace EgyptianSlot.EditorTools
             return rect;
         }
 
-        /// <summary>A plate that is a button, with its caption centred rather than stacked.</summary>
-        private static Button NewPlateButton(Transform parent, string name, float x, float width,
-            string caption, Sprite plateSprite, out Text label, Color? captionColor = null)
+        /// <summary>
+        /// A plate that is a button, positioned by its centre so it can be mirrored: the
+        /// pack ships one angled plate, and the pair either side of the spin button are
+        /// that shape facing opposite ways.
+        /// </summary>
+        private static Button NewPlateButton(Transform parent, string name, float centreX,
+            float width, float height, string caption, Sprite plateSprite, out Text label,
+            Color? captionColor = null, bool mirrored = false)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
             var rect = (RectTransform)go.transform;
             rect.SetParent(parent, false);
             rect.anchorMin = rect.anchorMax = new Vector2(0f, 0.5f);
-            rect.pivot = new Vector2(0f, 0.5f);
-            rect.anchoredPosition = new Vector2(x, 0f);
-            rect.sizeDelta = new Vector2(width, PlateHeight);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(centreX, 0f);
+            rect.sizeDelta = new Vector2(width, height);
 
             PaintPlate(go.GetComponent<Image>(), plateSprite, raycast: true);
 
@@ -653,6 +706,14 @@ namespace EgyptianSlot.EditorTools
             Stretch(label.rectTransform);
             label.text = caption;
             label.color = captionColor ?? Gold;
+
+            if (mirrored)
+            {
+                // Flip the plate, then flip the caption back so the words still read
+                // left to right.
+                rect.localScale = new Vector3(-1f, 1f, 1f);
+                label.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
+            }
 
             return go.GetComponent<Button>();
         }
@@ -701,16 +762,19 @@ namespace EgyptianSlot.EditorTools
             return go.GetComponent<Button>();
         }
 
-        /// <summary>The round spin button, centred in the bar.</summary>
+        /// <summary>
+        /// The round spin button, centred in the bar and raised by <paramref name="riseY"/>
+        /// so it sits proud of the plates on either side.
+        /// </summary>
         private static Button NewDisc(RectTransform parent, string name, float diameter,
-            Sprite discSprite, out Image image, out Text label)
+            Sprite discSprite, out Image image, out Text label, float riseY = 0f)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
             var rect = (RectTransform)go.transform;
             rect.SetParent(parent, false);
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = Vector2.zero;
+            rect.anchoredPosition = new Vector2(0f, riseY);
             rect.sizeDelta = new Vector2(diameter, diameter);
 
             image = go.GetComponent<Image>();
@@ -726,10 +790,18 @@ namespace EgyptianSlot.EditorTools
             return go.GetComponent<Button>();
         }
 
+        /// <summary>
+        /// Draws a plate sprite. A sprite with a nine-slice border stretches to its rect;
+        /// one without keeps its own shape, which is what an angled plate needs — slicing
+        /// such a shape pulls its middle apart.
+        /// </summary>
         private static void PaintPlate(Image image, Sprite plateSprite, bool raycast = false)
         {
+            bool hasBorder = plateSprite != null && plateSprite.border != Vector4.zero;
+
             image.sprite = plateSprite;
-            image.type = Image.Type.Sliced;
+            image.type = hasBorder ? Image.Type.Sliced : Image.Type.Simple;
+            image.preserveAspect = !hasBorder && plateSprite != null;
             image.raycastTarget = raycast;
             if (plateSprite == null) image.color = Stone;
         }

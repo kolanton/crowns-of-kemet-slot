@@ -37,6 +37,9 @@ namespace EgyptianSlot
         [SerializeField] private Sprite _spinIdleSprite;
         [SerializeField] private Sprite _spinPressedSprite;
 
+        [Header("Audio")]
+        [SerializeField] private SlotAudio _audio;
+
         private SlotMachineController _controller;
 
         /// <summary>Called once by the controller, which owns the lifetime of the pair.</summary>
@@ -44,14 +47,20 @@ namespace EgyptianSlot
         {
             _controller = controller;
 
+            // Spin has its own sound from the controller; the rest share a quieter click.
             if (_spinButton != null) _spinButton.onClick.AddListener(controller.Spin);
-            if (_levelUpButton != null) _levelUpButton.onClick.AddListener(() => controller.StepLineBet(1));
-            if (_levelDownButton != null) _levelDownButton.onClick.AddListener(() => controller.StepLineBet(-1));
-            if (_maxBetButton != null) _maxBetButton.onClick.AddListener(controller.MaxBet);
-            if (_autoplayButton != null) _autoplayButton.onClick.AddListener(controller.ToggleAutoplay);
-            if (_resetButton != null) _resetButton.onClick.AddListener(controller.ResetBalance);
+            if (_levelUpButton != null) _levelUpButton.onClick.AddListener(() => { Click(); controller.StepLineBet(1); });
+            if (_levelDownButton != null) _levelDownButton.onClick.AddListener(() => { Click(); controller.StepLineBet(-1); });
+            if (_maxBetButton != null) _maxBetButton.onClick.AddListener(() => { Click(); controller.MaxBet(); });
+            if (_autoplayButton != null) _autoplayButton.onClick.AddListener(() => { Click(); controller.ToggleAutoplay(); });
+            if (_resetButton != null) _resetButton.onClick.AddListener(() => { Click(); controller.ResetBalance(); });
 
             Refresh();
+        }
+
+        private void Click()
+        {
+            if (_audio != null) _audio.PlayClick();
         }
 
         private void Update()

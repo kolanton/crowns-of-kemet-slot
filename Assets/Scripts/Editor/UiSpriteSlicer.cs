@@ -31,7 +31,10 @@ namespace EgyptianSlot.EditorTools
         private static readonly Dictionary<string, float> BorderFractions = new()
         {
             { "ui_readout", 0.32f },
-            { "ui_button", 0.32f },
+
+            // ui_button is deliberately absent. Its plate is an angled trapezoid, and
+            // nine-slicing stretches the middle of that shape into a visibly broken one.
+            // It is drawn at its own aspect instead.
         };
 
         [MenuItem("Egyptian Slot/0b. Trim Exported UI Layers")]
