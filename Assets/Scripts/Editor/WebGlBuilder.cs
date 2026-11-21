@@ -88,9 +88,10 @@ namespace EgyptianSlot.EditorTools
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
             PlayerSettings.WebGL.decompressionFallback = true;
 
-            // The demo is 2D sprites and UI, so the extra size of exception support buys
-            // nothing a browser console would not already show.
-            PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.None;
+            // Keep thrown exceptions reportable. Without them a failure in the player is
+            // perfectly silent — no console entry, nothing on screen, just a scene that
+            // stops responding — which costs far more than the size this saves.
+            PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly;
             PlayerSettings.WebGL.dataCaching = true;
 
             // The stock minimal template: a bare canvas and loader, no Unity logo or
@@ -106,8 +107,11 @@ namespace EgyptianSlot.EditorTools
             PlayerSettings.runInBackground = false;
             PlayerSettings.SetIl2CppCompilerConfiguration(
                 NamedBuildTarget.WebGL, Il2CppCompilerConfiguration.Master);
+            // Low rather than High: the aggressive levels can strip code that is only ever
+            // reached from serialized scene data, such as the UI event modules, and the
+            // few megabytes saved are not worth debugging that.
             PlayerSettings.SetManagedStrippingLevel(
-                NamedBuildTarget.WebGL, ManagedStrippingLevel.High);
+                NamedBuildTarget.WebGL, ManagedStrippingLevel.Low);
 
             PlayerSettings.defaultWebScreenWidth = 1280;
             PlayerSettings.defaultWebScreenHeight = 720;

@@ -108,6 +108,32 @@
 
   .curtain p { margin: 0; color: var(--ink-dim); font-size: 0.9rem; }
 
+  .fullscreen {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    color: var(--gold);
+    background: rgba(13, 10, 14, 0.66);
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 120ms ease, border-color 120ms ease;
+  }
+
+  .fullscreen svg { display: block; width: 28px; height: 28px; }
+
+  .fullscreen:hover,
+  .fullscreen:focus-visible {
+    opacity: 1;
+    border-color: var(--gold);
+  }
+
   .curtain .stage {
     font-family: var(--display);
     letter-spacing: 0.14em;
@@ -242,6 +268,17 @@
       <div class="meter"><span id="bar"></span></div>
       <p id="hint">About 18&nbsp;MB on first load, then cached.</p>
     </div>
+    <button class="fullscreen" id="fullscreen" type="button" title="Fullscreen"
+            aria-label="Fullscreen" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"
+           stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">
+        <rect x="1.6" y="1.6" width="20.8" height="20.8" rx="2.6"></rect>
+        <path d="M9.4 5.2H5.2v4.2"></path><path d="M5.2 5.2l4.8 4.8"></path>
+        <path d="M14.6 5.2h4.2v4.2"></path><path d="M18.8 5.2l-4.8 4.8"></path>
+        <path d="M9.4 18.8H5.2v-4.2"></path><path d="M5.2 18.8l4.8-4.8"></path>
+        <path d="M14.6 18.8h4.2v-4.2"></path><path d="M18.8 18.8l-4.8-4.8"></path>
+      </svg>
+    </button>
   </div>
 
   <div class="columns">
@@ -327,9 +364,20 @@
     }, function (progress) {
       bar.style.width = Math.round(progress * 100) + "%";
       if (progress >= 1) stage.textContent = "Starting";
-    }).then(function () {
+    }).then(function (unityInstance) {
       curtain.hidden = true;
       document.getElementById("unity-canvas").focus();
+
+      // Offered only once the player exists, and only where the browser will grant it:
+      // some embedded views refuse fullscreen outright, and a button that silently does
+      // nothing is worse than no button.
+      var button = document.getElementById("fullscreen");
+      if (!document.fullscreenEnabled) return;
+
+      button.hidden = false;
+      button.addEventListener("click", function () {
+        unityInstance.SetFullscreen(1);
+      });
     }).catch(function (message) {
       fail(String(message));
     });
