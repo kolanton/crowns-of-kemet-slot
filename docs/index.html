@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Crowns of Kemet</title>
 
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amarante&family=Inter:wght@400;500;600&display=swap">
 
 <style>
   /* Layout: a single centred column — title, the 16:9 machine, then the paytable.
@@ -22,7 +22,8 @@
     --gold: #d9a94a;
     --lapis: #3f6fb5;
 
-    --display: "Cinzel", "Trajan Pro", Georgia, serif;
+    /* Amarante has one weight only, so nothing here asks for a bold it does not have. */
+    --display: "Amarante", "Trajan Pro", Georgia, serif;
     --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   }
 
@@ -78,7 +79,7 @@
 
   h1 {
     font-family: var(--display);
-    font-weight: 700;
+    font-weight: 400;
     font-size: clamp(1.9rem, 5vw, 3rem);
     letter-spacing: 0.04em;
     margin: 0;
@@ -217,8 +218,8 @@
 
   h2 {
     font-family: var(--display);
-    font-size: 0.78rem;
-    font-weight: 500;
+    font-size: 0.8rem;
+    font-weight: 400;
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--ink-dim);
@@ -297,7 +298,12 @@
   <p class="notice">
     <b>Demonstration build — not a gambling product</b>
     This is a technical prototype of slot mechanics, not a published game and not a
-    real-money product. It uses play-money credits with no monetary value: there is no
+    real-money product. It was built as a Unity learning exercise, to practise and show
+    a particular set of techniques: 2D sprite and atlas handling, reel animation and
+    stop timing, weighted random outcomes, payline evaluation with wild substitution and
+    full-column symbols, assembling a game UI from a third-party art pack, and packaging
+    the result as a WebGL build small enough to load on a phone.
+    It uses play-money credits with no monetary value: there is no
     wagering, no deposit, no purchase and no payout, and credits cannot be bought,
     redeemed or withdrawn. Outcomes come from an uncertified pseudorandom generator
     running in your browser; the paytable is illustrative and no return-to-player
@@ -394,8 +400,15 @@
 
   <footer>
     Art: <a href="https://assetstore.unity.com/packages/2d/gui/icons/free-egyptian-slot-game-art-symbols-wild-and-anubis-character-396700">Crowns of Kemet (FREE)</a>
-    by RetroStyle Games, used under the Unity Asset Store EULA. Reel logic, paytable and
-    spin feel built for this demo. Unity 6000.6.0f1, WebGL.
+    by RetroStyle Games.
+    Sound: <a href="https://assetstore.unity.com/packages/audio/sound-fx/ui-sfx-free-pack-245925">UI SFX Free Pack</a>
+    by Skril Studio.
+    Music: <a href="https://assetstore.unity.com/packages/audio/music/free-6-desert-tracks-music-pack-338276">Free 6 Desert Tracks</a>
+    by alkakrab — "Dunes of Silence".
+    All three used under the Unity Asset Store EULA.
+    Type: <a href="https://fonts.google.com/specimen/Amarante">Amarante</a> by Sorkin Type Co,
+    under the SIL Open Font License.
+    Reel logic, paytable and spin feel built for this demo. Unity 6000.6.0f1, WebGL.
   </footer>
 </div>
 

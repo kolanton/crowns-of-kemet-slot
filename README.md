@@ -5,7 +5,12 @@ A 5x3, ten-line slot machine built in Unity around RetroStyle Games' free
 Egyptian art pack.
 
 > **Demonstration build — not a gambling product.** A technical prototype of slot
-> mechanics, not a published game and not a real-money product. Play-money credits with
+> mechanics, not a published game and not a real-money product. It was built as a Unity
+> learning exercise, to practise and show a particular set of techniques: 2D sprite and
+> atlas handling, reel animation and stop timing, weighted random outcomes, payline
+> evaluation with wild substitution and full-column symbols, assembling a game UI from a
+> third-party art pack, and packaging the result as a WebGL build small enough to load
+> on a phone. Play-money credits with
 > no monetary value: no wagering, no deposit, no purchase, no payout, and credits cannot
 > be bought, redeemed or withdrawn. Outcomes come from an uncertified pseudorandom
 > generator running in the browser; the paytable is illustrative and no return-to-player
@@ -116,7 +121,22 @@ cell on the line, so a wild joins whichever run it could most plausibly belong t
 all-wild line pays as the wild. Anubis is a scatter — it pays on count anywhere on the
 grid, times the total bet, and never forms line runs.
 
-## Licence
+## Credits and licence
 
-The code here is mine to share. The art is RetroStyle Games', used under the Standard
-Unity Asset Store EULA, and is not included — see above.
+The code here is mine to share. The third-party assets are not included in this
+repository and must be acquired from the Asset Store, which is where their licences
+allow them to come from:
+
+| Asset | Author | Terms |
+| --- | --- | --- |
+| [Crowns of Kemet (FREE)](https://assetstore.unity.com/packages/2d/gui/icons/free-egyptian-slot-game-art-symbols-wild-and-anubis-character-396700) | RetroStyle Games | Unity Asset Store EULA |
+| [UI SFX Free Pack](https://assetstore.unity.com/packages/audio/sound-fx/ui-sfx-free-pack-245925) | Skril Studio | Unity Asset Store EULA |
+| [Free 6 Desert Tracks Music Pack](https://assetstore.unity.com/packages/audio/music/free-6-desert-tracks-music-pack-338276) | alkakrab | Unity Asset Store EULA |
+
+The one exception is the typeface, [Amarante](https://fonts.google.com/specimen/Amarante)
+by Sorkin Type Co. It is under the SIL Open Font License, which permits redistribution,
+so it ships in `Assets/Fonts/` with its licence text alongside.
+
+Everything under `Assets/` that belongs to the packs above is gitignored. The build in
+`docs/` has their content compiled into it, which is ordinary product use rather than
+redistribution.

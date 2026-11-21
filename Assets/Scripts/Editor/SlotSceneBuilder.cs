@@ -19,6 +19,7 @@ namespace EgyptianSlot.EditorTools
     {
         private const string ScenePath = "Assets/Scenes/SlotDemo.unity";
         private const string ConfigPath = "Assets/Settings/SlotConfig.asset";
+        private const string FontPath = "Assets/Fonts/Amarante-Regular.ttf";
 
         private const float ReferenceWidth = 1280f;
         private const float ReferenceHeight = 720f;
@@ -37,7 +38,21 @@ namespace EgyptianSlot.EditorTools
         private const float GridCenterY = 24f;
 
         private const float BarHeight = 128f;
-        private const float PlateHeight = 80f;
+
+        /// <summary>
+        /// The readout plate's own height. Its art is 248x64 with chamfered corners, so
+        /// drawing it taller stretches the thin rails top and bottom and pulls the
+        /// chamfers out of shape. Kept at the native height, it is never distorted
+        /// vertically and only stretches along its length, which is what the nine-slice
+        /// is for.
+        /// </summary>
+        private const float PlateHeight = 64f;
+
+        /// <summary>
+        /// How far the plates and buttons sit below the bar's centre line, leaving room
+        /// for their captions above them.
+        /// </summary>
+        private const float BarContentY = -12f;
 
         /// <summary>
         /// Symbol value ranking, low to high, matched by filename substring. The pack ships
@@ -537,7 +552,9 @@ namespace EgyptianSlot.EditorTools
 
             NewPlate(barRect, "Bet", 36f, 140f, "BET", plate, out var betValue);
 
-            var levelPlate = NewPlate(barRect, "Level", 190f, 230f, "LEVEL", plate, out var levelValue);
+            // Narrower than the other readouts so its arrows sit close to the number
+            // rather than stranded at the far ends of a wide plate.
+            var levelPlate = NewPlate(barRect, "Level", 196f, 190f, "LEVEL", plate, out var levelValue);
             var levelDown = NewArrow(levelPlate, "LevelDown", "<", packArrow, plate, left: true);
             var levelUp = NewArrow(levelPlate, "LevelUp", ">", packArrow, plate, left: false);
 
@@ -563,7 +580,7 @@ namespace EgyptianSlot.EditorTools
             // Added last so it draws over both plates, and lifted so it rides above the
             // line of the bar rather than sitting flush with it.
             var spinButton = NewDisc(barRect, "Spin", discDiameter, disc,
-                out var spinImage, out var spinLabel, riseY: 12f);
+                out var spinImage, out var spinLabel, riseY: BarContentY + 10f);
 
             // The pack's spin button is painted with its own symbol, so a caption over it
             // would only compete with the art.
@@ -639,6 +656,21 @@ namespace EgyptianSlot.EditorTools
             if (Object.FindFirstObjectByType<AudioListener>() == null)
                 audio.gameObject.AddComponent<AudioListener>();
 
+            var music = SlotAudioCatalog.FindMusic();
+            if (music == null)
+            {
+                Debug.Log("[SlotSceneBuilder] No music track found; effects only.");
+                return;
+            }
+
+            var musicSource = audio.gameObject.AddComponent<AudioSource>();
+            musicSource.playOnAwake = false;
+            musicSource.loop = true;
+            SetPrivateField(audio, "_musicSource", musicSource);
+            SetPrivateField(audio, "_music", music);
+
+            Debug.Log($"[SlotSceneBuilder] Music: {music.name} ({music.length:0}s)");
+
             Debug.Log("[SlotSceneBuilder] Audio wired: " +
                       string.Join(", ", clips.Select(pair => $"{pair.Key}={pair.Value.Count}")));
         }
@@ -663,27 +695,31 @@ namespace EgyptianSlot.EditorTools
             rect.SetParent(parent, false);
             rect.anchorMin = rect.anchorMax = new Vector2(0f, 0.5f);
             rect.pivot = new Vector2(0f, 0.5f);
-            rect.anchoredPosition = new Vector2(x, 0f);
+            rect.anchoredPosition = new Vector2(x, BarContentY);
             rect.sizeDelta = new Vector2(width, PlateHeight);
 
             PaintPlate(go.GetComponent<Image>(), plateSprite);
 
+            // The caption sits above the plate rather than inside it. The plate is only
+            // 64 high; stacking a caption and a value within it forced it taller, which
+            // is what distorted the art.
             var captionLabel = NewLabel("Caption", rect, 16, TextAnchor.MiddleCenter);
             var captionRect = captionLabel.rectTransform;
-            captionRect.anchorMin = new Vector2(0f, 1f);
-            captionRect.anchorMax = new Vector2(1f, 1f);
-            captionRect.pivot = new Vector2(0.5f, 1f);
-            captionRect.offsetMin = new Vector2(0f, -30f);
-            captionRect.offsetMax = new Vector2(0f, -8f);
+            captionRect.anchorMin = captionRect.anchorMax = new Vector2(0.5f, 1f);
+            captionRect.pivot = new Vector2(0.5f, 0f);
+            captionRect.anchoredPosition = new Vector2(0f, 4f);
+            captionRect.sizeDelta = new Vector2(width, 20f);
             captionLabel.text = caption;
             captionLabel.color = GoldDim;
 
-            value = NewLabel("Value", rect, 30, TextAnchor.MiddleCenter);
+            // The value fills the plate, so anything aligned to the plate's centre is
+            // also aligned to the number.
+            value = NewLabel("Value", rect, 28, TextAnchor.MiddleCenter);
             var valueRect = value.rectTransform;
             valueRect.anchorMin = Vector2.zero;
             valueRect.anchorMax = Vector2.one;
-            valueRect.offsetMin = new Vector2(0f, 6f);
-            valueRect.offsetMax = new Vector2(0f, -28f);
+            valueRect.offsetMin = new Vector2(8f, 4f);
+            valueRect.offsetMax = new Vector2(-8f, -4f);
             value.color = Gold;
             value.text = "0";
 
@@ -704,7 +740,7 @@ namespace EgyptianSlot.EditorTools
             rect.SetParent(parent, false);
             rect.anchorMin = rect.anchorMax = new Vector2(0f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(centreX, 0f);
+            rect.anchoredPosition = new Vector2(centreX, BarContentY);
             rect.sizeDelta = new Vector2(width, height);
 
             PaintPlate(go.GetComponent<Image>(), plateSprite, raycast: true);
@@ -738,9 +774,10 @@ namespace EgyptianSlot.EditorTools
             rect.SetParent(plate, false);
             // Pivoted at its centre: mirroring scales about the pivot, so an edge pivot
             // would throw the flipped arrow outside the plate instead of turning it.
+            // Vertically centred on the plate, which is now where the number is.
             rect.anchorMin = rect.anchorMax = new Vector2(left ? 0f : 1f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(left ? 24f : -24f, 0f);
+            rect.anchoredPosition = new Vector2(left ? 20f : -20f, 0f);
 
             var image = go.GetComponent<Image>();
 
@@ -835,7 +872,7 @@ namespace EgyptianSlot.EditorTools
             go.transform.SetParent(parent, false);
 
             var text = go.GetComponent<Text>();
-            text.font = LegacyFont();
+            text.font = UiFont();
             text.fontSize = fontSize;
             text.alignment = anchor;
             text.color = Color.white;
@@ -846,18 +883,28 @@ namespace EgyptianSlot.EditorTools
         }
 
         /// <summary>
-        /// The built-in UI font. Resources.GetBuiltinResource is the only way to reach it
-        /// from a generated scene, and its name changed in newer editors.
+        /// The HUD typeface. Amarante is an Art Nouveau display face whose weight and
+        /// flared serifs sit with the pack's gilt ornament far better than a UI sans.
+        /// It ships with the project under the Open Font License.
+        ///
+        /// Falls back to Unity's built-in font, whose name changed in newer editors, so
+        /// the scene still builds if the font file is missing.
         /// </summary>
-        private static Font LegacyFont()
+        private static Font UiFont()
         {
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
-                       ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+            var font = AssetDatabase.LoadAssetAtPath<Font>(FontPath);
+            if (font != null) return font;
 
-            if (font == null)
-                Debug.LogWarning("[SlotSceneBuilder] No built-in font found; labels will be blank.");
+            Debug.LogWarning($"[SlotSceneBuilder] {FontPath} not found; falling back to the " +
+                             "built-in font.");
 
-            return font;
+            var builtin = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
+                          ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+            if (builtin == null)
+                Debug.LogWarning("[SlotSceneBuilder] No built-in font either; labels will be blank.");
+
+            return builtin;
         }
 
         private static void Stretch(RectTransform rect)

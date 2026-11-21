@@ -19,6 +19,19 @@ namespace EgyptianSlot.EditorTools
         private const string PackRoot = "Assets/UI SFX Free Pack";
 
         /// <summary>
+        /// Where the music pack lands. Searched separately from the effects pack because
+        /// only one track is wanted and it is chosen by name, not by folder.
+        /// </summary>
+        private const string MusicRoot = "Assets";
+
+        /// <summary>
+        /// The looped exports live in their own folder and share filenames with the
+        /// one-shot versions, so the folder is what distinguishes them. A bed has to run
+        /// for as long as anyone plays, so the looped export is the one wanted.
+        /// </summary>
+        private const string MusicLoopFolder = "/loops/";
+
+        /// <summary>
         /// Event name and the pack folders whose clips suit it, matched by path substring.
         /// A clip may serve more than one event; these are not exclusive.
         /// </summary>
@@ -77,6 +90,32 @@ namespace EgyptianSlot.EditorTools
             return catalog;
         }
 
+        /// <summary>
+        /// The background track: the longest looped clip from the desert music pack. Length
+        /// is the tiebreak because a music bed is minutes long where every effect is under
+        /// a second, so it separates the two without relying on folder names.
+        /// </summary>
+        public static AudioClip FindMusic()
+        {
+            var candidates = AssetDatabase.FindAssets("t:AudioClip", new[] { MusicRoot })
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Where(path => !path.StartsWith(PackRoot))
+                .Select(path => (path: path.ToLowerInvariant().Replace('\\', '/'),
+                                 clip: AssetDatabase.LoadAssetAtPath<AudioClip>(path)))
+                .Where(entry => entry.clip != null && entry.clip.length > 20f)
+                .ToList();
+
+            if (candidates.Count == 0) return null;
+
+            var looped = candidates.Where(entry => entry.path.Contains(MusicLoopFolder)).ToList();
+            var pool = looped.Count > 0 ? looped : candidates;
+
+            // Ordered by name so the choice is the same on every rebuild rather than
+            // whatever the asset database happened to return first.
+            return pool.OrderBy(entry => entry.clip.name, System.StringComparer.Ordinal)
+                .First().clip;
+        }
+
         public static AudioClip[] For(Dictionary<string, List<AudioClip>> catalog, string role) =>
             catalog.TryGetValue(role, out var list) ? list.ToArray() : System.Array.Empty<AudioClip>();
 
@@ -119,6 +158,38 @@ namespace EgyptianSlot.EditorTools
             }
 
             Debug.Log($"[SlotAudioCatalog] Applied web audio settings to {changed} clips.");
+
+            ApplyMusicSettings();
+        }
+
+        /// <summary>
+        /// Settings for the one background track, which differ from the effects'. A
+        /// three-minute bed decompressed on load would sit in memory as tens of megabytes
+        /// of raw audio — the sort of cost that already broke this demo on a phone once —
+        /// so it stays compressed and is decoded as it plays. It also keeps its stereo
+        /// image, which matters for music and not for a button click.
+        /// </summary>
+        private static void ApplyMusicSettings()
+        {
+            var music = FindMusic();
+            if (music == null) return;
+
+            string path = AssetDatabase.GetAssetPath(music);
+            if (AssetImporter.GetAtPath(path) is not AudioImporter importer) return;
+
+            var settings = importer.defaultSampleSettings;
+            settings.loadType = AudioClipLoadType.CompressedInMemory;
+            settings.compressionFormat = AudioCompressionFormat.Vorbis;
+            settings.quality = 0.35f;
+            settings.preloadAudioData = true;
+
+            importer.defaultSampleSettings = settings;
+            importer.forceToMono = false;
+            importer.loadInBackground = false;
+
+            importer.SaveAndReimport();
+
+            Debug.Log($"[SlotAudioCatalog] Music set to compressed-in-memory Vorbis: {path}");
         }
 
         [MenuItem("Egyptian Slot/1b. Report Imported Audio")]
