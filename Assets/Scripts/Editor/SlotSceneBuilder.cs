@@ -95,7 +95,7 @@ namespace EgyptianSlot.EditorTools
 
             var reels = CreateReels(canvas, config, catalog);
             var winPresenter = CreateWinPresenter(canvas, catalog);
-            var hud = CreateHud(canvas);
+            var hud = CreateHud(canvas, catalog);
 
             var machine = new GameObject("SlotMachine").AddComponent<SlotMachineController>();
             SetPrivateField(machine, "_config", config);
@@ -495,10 +495,22 @@ namespace EgyptianSlot.EditorTools
         /// the left, spin in the middle, wallet on the right. The pack ships no button art,
         /// so the plates and disc come from <see cref="UiArtGenerator"/>.
         /// </summary>
-        private static SlotHud CreateHud(Canvas canvas)
+        private static SlotHud CreateHud(Canvas canvas, Dictionary<string, List<Sprite>> catalog)
         {
-            var plate = AssetDatabase.LoadAssetAtPath<Sprite>(UiArtGenerator.PlatePath);
-            var disc = AssetDatabase.LoadAssetAtPath<Sprite>(UiArtGenerator.DiscPath);
+            // The pack's own HUD art, exported from its Photoshop source, is preferred over
+            // the shapes this project generates. The generated ones remain the fallback so
+            // the scene still builds for anyone who has only the plain sprite pack.
+            var packReadout = First(catalog, "packReadout");
+            var packButton = First(catalog, "packButton");
+            var packSpin = First(catalog, "packSpin");
+            var packSpinPressed = First(catalog, "packSpinPressed");
+            var packArrow = First(catalog, "packArrow");
+
+            var plate = packReadout
+                        ?? AssetDatabase.LoadAssetAtPath<Sprite>(UiArtGenerator.PlatePath);
+            var buttonPlate = packButton ?? plate;
+            var disc = packSpin
+                       ?? AssetDatabase.LoadAssetAtPath<Sprite>(UiArtGenerator.DiscPath);
 
             var bar = new GameObject("Hud", typeof(RectTransform), typeof(Image));
             var barRect = (RectTransform)bar.transform;
@@ -517,17 +529,26 @@ namespace EgyptianSlot.EditorTools
             NewPlate(barRect, "Bet", 36f, 140f, "BET", plate, out var betValue);
 
             var levelPlate = NewPlate(barRect, "Level", 190f, 230f, "LEVEL", plate, out var levelValue);
-            var levelDown = NewArrow(levelPlate, "LevelDown", "<", plate, left: true);
-            var levelUp = NewArrow(levelPlate, "LevelUp", ">", plate, left: false);
+            var levelDown = NewArrow(levelPlate, "LevelDown", "<", packArrow, plate, left: true);
+            var levelUp = NewArrow(levelPlate, "LevelUp", ">", packArrow, plate, left: false);
 
-            var autoButton = NewPlateButton(barRect, "AutoPlay", 436f, 140f, "AUTO\nPLAY", plate,
-                out var autoLabel);
-            var maxBetButton = NewPlateButton(barRect, "MaxBet", 704f, 140f, "MAX\nBET", plate, out _);
+            // The pack's button plate is solid gilt, so its caption has to be dark to read;
+            // the generated fallback plate is dark stone and wants the opposite.
+            Color buttonCaption = packButton != null ? Carved : Gold;
 
-            NewPlate(barRect, "LineBet", 858f, 160f, "LINE BET", plate, out var lineBetValue);
-            NewPlate(barRect, "Coins", 1032f, 212f, "COINS", plate, out var balanceValue);
+            var autoButton = NewPlateButton(barRect, "AutoPlay", 436f, 150f, "AUTO\nPLAY",
+                buttonPlate, out var autoLabel, buttonCaption);
+            var maxBetButton = NewPlateButton(barRect, "MaxBet", 712f, 150f, "MAX\nBET",
+                buttonPlate, out _, buttonCaption);
 
-            var spinButton = NewDisc(barRect, "Spin", 108f, disc, out var spinImage, out var spinLabel);
+            NewPlate(barRect, "LineBet", 876f, 150f, "LINE BET", plate, out var lineBetValue);
+            NewPlate(barRect, "Coins", 1040f, 204f, "COINS", plate, out var balanceValue);
+
+            var spinButton = NewDisc(barRect, "Spin", 112f, disc, out var spinImage, out var spinLabel);
+
+            // The pack's spin button is painted with its own symbol, so a caption over it
+            // would only compete with the art.
+            if (packSpin != null) spinLabel.enabled = false;
 
             // Reset has no counterpart in the pack's mock-up, so it sits out of the bar
             // rather than crowding a layout the background art was composed around.
@@ -561,6 +582,8 @@ namespace EgyptianSlot.EditorTools
             SetPrivateField(hud, "_resetButton", resetButton);
             SetPrivateField(hud, "_spinImage", spinImage);
             SetPrivateField(hud, "_spinLabel", spinLabel);
+            SetPrivateField(hud, "_spinIdleSprite", packSpin);
+            SetPrivateField(hud, "_spinPressedSprite", packSpinPressed);
 
             return hud;
         }
@@ -614,7 +637,7 @@ namespace EgyptianSlot.EditorTools
 
         /// <summary>A plate that is a button, with its caption centred rather than stacked.</summary>
         private static Button NewPlateButton(Transform parent, string name, float x, float width,
-            string caption, Sprite plateSprite, out Text label)
+            string caption, Sprite plateSprite, out Text label, Color? captionColor = null)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
             var rect = (RectTransform)go.transform;
@@ -629,24 +652,46 @@ namespace EgyptianSlot.EditorTools
             label = NewLabel("Label", rect, 20, TextAnchor.MiddleCenter);
             Stretch(label.rectTransform);
             label.text = caption;
-            label.color = Gold;
+            label.color = captionColor ?? Gold;
 
             return go.GetComponent<Button>();
         }
 
-        /// <summary>A small square arrow button pinned inside a plate's left or right end.</summary>
+        /// <summary>
+        /// A stepper arrow pinned inside a plate's left or right end. With the pack's arrow
+        /// art it is drawn near its native 21x22 so it stays crisp, and the right-hand one
+        /// is the same sprite mirrored. Without it, a text glyph on a plate stands in.
+        /// </summary>
         private static Button NewArrow(RectTransform plate, string name, string glyph,
-            Sprite plateSprite, bool left)
+            Sprite arrowSprite, Sprite plateSprite, bool left)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
             var rect = (RectTransform)go.transform;
             rect.SetParent(plate, false);
+            // Pivoted at its centre: mirroring scales about the pivot, so an edge pivot
+            // would throw the flipped arrow outside the plate instead of turning it.
             rect.anchorMin = rect.anchorMax = new Vector2(left ? 0f : 1f, 0.5f);
-            rect.pivot = new Vector2(left ? 0f : 1f, 0.5f);
-            rect.anchoredPosition = new Vector2(left ? 8f : -8f, 0f);
-            rect.sizeDelta = new Vector2(40f, 56f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(left ? 24f : -24f, 0f);
 
-            PaintPlate(go.GetComponent<Image>(), plateSprite, raycast: true);
+            var image = go.GetComponent<Image>();
+
+            if (arrowSprite != null)
+            {
+                rect.sizeDelta = new Vector2(30f, 32f);
+                image.sprite = arrowSprite;
+                image.preserveAspect = true;
+                image.raycastTarget = true;
+
+                // The pack ships one arrow and it points right, so the left-hand one is
+                // that sprite mirrored.
+                if (left) rect.localScale = new Vector3(-1f, 1f, 1f);
+
+                return go.GetComponent<Button>();
+            }
+
+            rect.sizeDelta = new Vector2(40f, 56f);
+            PaintPlate(image, plateSprite, raycast: true);
 
             var label = NewLabel("Label", rect, 24, TextAnchor.MiddleCenter);
             Stretch(label.rectTransform);

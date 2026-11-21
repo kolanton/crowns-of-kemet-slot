@@ -33,6 +33,10 @@ namespace EgyptianSlot
         [SerializeField] private Image _spinImage;
         [SerializeField] private Text _spinLabel;
 
+        [Tooltip("Optional. When both are set the button swaps artwork instead of dimming.")]
+        [SerializeField] private Sprite _spinIdleSprite;
+        [SerializeField] private Sprite _spinPressedSprite;
+
         private SlotMachineController _controller;
 
         /// <summary>Called once by the controller, which owns the lifetime of the pair.</summary>
@@ -79,12 +83,25 @@ namespace EgyptianSlot
             if (_resetButton != null) _resetButton.interactable = !spinning;
 
             if (_spinLabel != null) _spinLabel.text = spinning ? "" : "SPIN";
+
             if (_spinImage != null)
             {
-                // Dim the disc while it cannot be pressed, so the button's state is visible
-                // without a second piece of art.
-                float tint = _controller.CanSpin() ? 1f : 0.45f;
-                _spinImage.color = new Color(tint, tint, tint, 1f);
+                bool hasBothStates = _spinIdleSprite != null && _spinPressedSprite != null;
+
+                if (hasBothStates)
+                {
+                    // The pack draws the button's states, so use them rather than tinting
+                    // artwork that was lit by hand.
+                    _spinImage.sprite = spinning ? _spinPressedSprite : _spinIdleSprite;
+                    _spinImage.color = Color.white;
+                }
+                else
+                {
+                    // Without a second state, dim the disc so the button still reads as
+                    // unavailable.
+                    float tint = _controller.CanSpin() ? 1f : 0.45f;
+                    _spinImage.color = new Color(tint, tint, tint, 1f);
+                }
             }
 
             if (_autoplayLabel != null)

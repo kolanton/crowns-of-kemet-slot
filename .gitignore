@@ -16,3 +16,8 @@
 # Acquire it free from the store link in README.md, then import it here.
 Assets/RetroStyle Games/
 Assets/RetroStyle Games.meta
+
+# Scratch folders used to inspect pack art locally. These hold copies of
+# licensed Asset Store files and must never be published.
+/docs/_ui/
+/docs/_bg_inspect.png

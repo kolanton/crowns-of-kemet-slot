@@ -50,6 +50,14 @@ namespace EgyptianSlot.EditorTools
             // mistaken for reel art.
             new("ui", new[] { "assets/generated" }),
 
+            // HUD art exported from the pack's Photoshop source. The pressed variant is
+            // matched before the idle one, since its name contains the idle one's.
+            new("packSpinPressed", new[] { "ui_spin_pressed" }),
+            new("packSpin",        new[] { "ui_spin" }),
+            new("packButton",      new[] { "ui_button" }),
+            new("packReadout",     new[] { "ui_readout" }),
+            new("packArrow",       new[] { "ui_arrow" }),
+
             // The framed portrait is the one that fits a reel cell; the full-body art is
             // kept apart so it can be used as scenery rather than landing on the reels.
             new("scatter",    new[] { "anubis_frame" }),
