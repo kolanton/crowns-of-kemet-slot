@@ -1,0 +1,17 @@
+# Unity
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+*.csproj
+*.sln
+*.slnx
+
+# Raw build output; the served copy lives in docs/
+Build/
+
+# Third-party art, redistributable only through the Unity Asset Store.
+# Acquire it free from the store link in README.md, then import it here.
+Assets/RetroStyle Games/
+Assets/RetroStyle Games.meta

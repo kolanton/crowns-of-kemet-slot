@@ -1,0 +1,331 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Crowns of Kemet</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap">
+
+<style>
+  /* Layout: a single centred column — title, the 16:9 machine, then the paytable.
+     Deliberately single-theme dark: the art is a lit temple interior, and a light
+     ground would leave the canvas floating on paper. */
+  :root {
+    color-scheme: dark;
+
+    --ground: #0d0a0e;
+    --panel: #171220;
+    --edge: #2e2438;
+    --ink: #ece4da;
+    --ink-dim: #9b8e9f;
+    --gold: #d9a94a;
+    --lapis: #3f6fb5;
+
+    --display: "Cinzel", "Trajan Pro", Georgia, serif;
+    --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* A class rule setting display out-specifies the user agent's [hidden], so hiding
+     the curtain with el.hidden needs this to bite. The artifact host injects the same
+     rule; a plain static page has nothing of the kind. */
+  [hidden] { display: none !important; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    margin: 0;
+    padding-block: 28px 48px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  .page {
+    max-width: 1120px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.9rem, 5vw, 3rem);
+    letter-spacing: 0.04em;
+    margin: 0;
+    color: var(--gold);
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    color: var(--ink-dim);
+    font-size: 0.95rem;
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  /* The machine ------------------------------------------------------------ */
+
+  .machine {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    max-width: 100%;
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    background: #000;
+    overflow: hidden;
+  }
+
+  #unity-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    outline: none;
+  }
+
+  #unity-canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+
+  .curtain {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: var(--panel);
+    text-align: center;
+    padding: 24px;
+  }
+
+  .curtain p { margin: 0; color: var(--ink-dim); font-size: 0.9rem; }
+
+  .curtain .stage {
+    font-family: var(--display);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    color: var(--gold);
+  }
+
+  .meter {
+    width: min(320px, 70%);
+    height: 2px;
+    background: var(--edge);
+    overflow: hidden;
+  }
+
+  .meter span {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: var(--gold);
+    transition: width 120ms linear;
+  }
+
+  .fail {
+    color: var(--ink);
+    font-size: 0.9rem;
+    max-width: 48ch;
+    line-height: 1.6;
+  }
+
+  /* Reference --------------------------------------------------------------- */
+
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 28px;
+  }
+
+  section { min-width: 0; }
+
+  h2 {
+    font-family: var(--display);
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--edge);
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+
+  th {
+    text-align: right;
+    font-weight: 500;
+    color: var(--ink-dim);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0 0 6px;
+  }
+
+  th:first-child { text-align: left; }
+
+  td {
+    padding: 7px 0;
+    border-top: 1px solid rgba(46, 36, 56, 0.6);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  td:first-child { text-align: left; color: var(--ink); }
+
+  .sym-wild td:first-child { color: var(--gold); }
+  .sym-scatter td:first-child { color: var(--lapis); }
+
+  caption {
+    caption-side: bottom;
+    text-align: left;
+    color: var(--ink-dim);
+    font-size: 0.76rem;
+    padding-top: 10px;
+    line-height: 1.5;
+  }
+
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 7px 16px; font-size: 0.88rem; }
+  dt { color: var(--ink-dim); }
+  dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+  kbd {
+    font-family: var(--body);
+    font-size: 0.78rem;
+    border: 1px solid var(--edge);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 1px 6px;
+    color: var(--ink);
+  }
+
+  footer {
+    color: var(--ink-dim);
+    font-size: 0.78rem;
+    line-height: 1.6;
+    border-top: 1px solid var(--edge);
+    padding-top: 16px;
+  }
+
+  a { color: var(--gold); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .meter span { transition: none; }
+  }
+</style>
+
+<div class="page">
+  <header>
+    <h1>Crowns of Kemet</h1>
+    <p class="standfirst">
+      A five-reel, ten-line slot built in Unity around RetroStyle Games' free Egyptian art pack.
+      Play money only — the wallet resets, nothing is wagered.
+    </p>
+  </header>
+
+  <div class="machine">
+    <canvas id="unity-canvas" width="1280" height="720" tabindex="0"></canvas>
+    <div class="curtain" id="curtain">
+      <span class="stage" id="stage">Loading</span>
+      <div class="meter"><span id="bar"></span></div>
+      <p id="hint">About 18&nbsp;MB on first load, then cached.</p>
+    </div>
+  </div>
+
+  <div class="columns">
+    <section>
+      <h2>Paytable</h2>
+      <table>
+        <thead>
+          <tr><th>Symbol</th><th>3</th><th>4</th><th>5</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Ankh</td><td>4</td><td>13</td><td>40</td></tr>
+          <tr><td>Scarab</td><td>19</td><td>64</td><td>193</td></tr>
+          <tr><td>Necklace</td><td>34</td><td>115</td><td>347</td></tr>
+          <tr><td>Eye of Horus</td><td>50</td><td>166</td><td>500</td></tr>
+          <tr class="sym-wild"><td>Wild</td><td>50</td><td>200</td><td>1000</td></tr>
+          <tr class="sym-scatter"><td>Anubis</td><td>2</td><td>10</td><td>50</td></tr>
+        </tbody>
+        <caption>
+          Coins per line bet, left to right from reel one. Wild substitutes for any paying
+          symbol. Anubis is drawn a full column tall, so he covers a whole reel when he
+          lands and is counted once per reel — three reels pay, times the total bet rather
+          than the line bet. He never forms a line run.
+        </caption>
+      </table>
+    </section>
+
+    <section>
+      <h2>The machine</h2>
+      <dl>
+        <dt>Grid</dt><dd>5 &times; 3</dd>
+        <dt>Paylines</dt><dd>10, fixed</dd>
+        <dt>Line bet</dt><dd>1 / 2 / 5 / 10 / 25</dd>
+        <dt>Total bet</dt><dd>line bet &times; 10</dd>
+        <dt>Starting wallet</dt><dd>1000</dd>
+      </dl>
+
+      <h2 style="margin-top:24px">Controls</h2>
+      <dl>
+        <dt><kbd>Space</kbd> <kbd>Enter</kbd></dt><dd>Spin</dd>
+        <dt>LEVEL <kbd>&lt;</kbd> <kbd>&gt;</kbd></dt><dd>Step the stake up or down</dd>
+        <dt>MAX BET</dt><dd>Jump to the highest stake</dd>
+        <dt>AUTO PLAY</dt><dd>Spin until stopped or broke</dd>
+        <dt>RESET</dt><dd>Refill the wallet</dd>
+      </dl>
+    </section>
+  </div>
+
+  <footer>
+    Art: <a href="https://assetstore.unity.com/packages/2d/gui/icons/free-egyptian-slot-game-art-symbols-wild-and-anubis-character-396700">Crowns of Kemet (FREE)</a>
+    by RetroStyle Games, used under the Unity Asset Store EULA. Reel logic, paytable and
+    spin feel built for this demo. Unity 6000.6.0f1, WebGL.
+  </footer>
+</div>
+
+<script src="Build/WebGL.loader.js"></script>
+<script>
+  (function () {
+    var curtain = document.getElementById("curtain");
+    var stage = document.getElementById("stage");
+    var hint = document.getElementById("hint");
+    var bar = document.getElementById("bar");
+
+    function fail(message) {
+      stage.textContent = "Could not start";
+      bar.parentNode.hidden = true;
+      hint.className = "fail";
+      hint.textContent = message;
+    }
+
+    if (typeof createUnityInstance !== "function") {
+      fail("The Unity loader did not load, so the player could not start.");
+      return;
+    }
+
+    createUnityInstance(document.getElementById("unity-canvas"), {
+      dataUrl: "Build/WebGL.data.unityweb",
+      frameworkUrl: "Build/WebGL.framework.js.unityweb",
+      codeUrl: "Build/WebGL.wasm.unityweb",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "Egyptian Slot Demo",
+      productName: "Egyptian Slot",
+      productVersion: "1.0"
+    }, function (progress) {
+      bar.style.width = Math.round(progress * 100) + "%";
+      if (progress >= 1) stage.textContent = "Starting";
+    }).then(function () {
+      curtain.hidden = true;
+      document.getElementById("unity-canvas").focus();
+    }).catch(function (message) {
+      fail(String(message));
+    });
+  })();
+</script>
