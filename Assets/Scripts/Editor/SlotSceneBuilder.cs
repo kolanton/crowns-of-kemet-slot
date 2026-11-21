@@ -29,9 +29,12 @@ namespace EgyptianSlot.EditorTools
         // The frame is drawn at this size; the grid inside it is measured from the art
         // rather than fixed, so the cells follow whatever window the frame actually has.
         private const float ReelGap = 5f;
-        private const float FrameWidth = 820f;
-        private const float FrameHeight = 553f;
-        private const float GridCenterY = 48f;
+        // The frame's painted window turns out to be about 69% x 61% of the art, so the
+        // frame is drawn large enough that the grid inside it still reads at a usable size.
+        // Its foot runs behind the HUD bar, as it does in the pack's own mock-up.
+        private const float FrameWidth = 960f;
+        private const float FrameHeight = 648f;
+        private const float GridCenterY = 24f;
 
         private const float BarHeight = 128f;
         private const float PlateHeight = 80f;

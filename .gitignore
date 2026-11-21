@@ -8,8 +8,9 @@
 *.sln
 *.slnx
 
-# Raw build output; the served copy lives in docs/
-Build/
+# Raw build output; the served copy lives in docs/ and must stay tracked, so this
+# is anchored to the root rather than matching Build/ at any depth.
+/Build/
 
 # Third-party art, redistributable only through the Unity Asset Store.
 # Acquire it free from the store link in README.md, then import it here.
