@@ -777,13 +777,16 @@ namespace EgyptianSlot.EditorTools
             // Vertically centred on the plate, which is now where the number is.
             rect.anchorMin = rect.anchorMax = new Vector2(left ? 0f : 1f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(left ? 20f : -20f, 0f);
+            // Inset past the plate's chamfered corner. The nine-slice holds 20px of
+            // unstretched corner at each end, plus the gold rail, so anything closer than
+            // this sits on the frame rather than inside it.
+            rect.anchoredPosition = new Vector2(left ? 34f : -34f, 0f);
 
             var image = go.GetComponent<Image>();
 
             if (arrowSprite != null)
             {
-                rect.sizeDelta = new Vector2(30f, 32f);
+                rect.sizeDelta = new Vector2(24f, 26f);
                 image.sprite = arrowSprite;
                 image.preserveAspect = true;
                 image.raycastTarget = true;
