@@ -161,8 +161,19 @@
     border-color: var(--gold);
   }
 
-  /* Sound starts off, so the button advertises itself until it is switched on. */
-  .sound[aria-pressed="false"] { opacity: 0.85; }
+  /* The two states have to be readable at a glance, so they differ in colour, border
+     and ground as well as in the glyph — not by one small stroke. */
+  .sound[aria-pressed="true"] {
+    color: var(--gold);
+    border-color: var(--gold);
+    background: rgba(217, 169, 74, 0.2);
+    opacity: 1;
+  }
+
+  .sound[aria-pressed="false"] {
+    color: var(--ink-dim);
+    opacity: 0.75;
+  }
 
   .curtain .stage {
     font-family: var(--display);
@@ -325,15 +336,13 @@
             aria-label="Sound off" aria-pressed="false" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z"></path>
+        <path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z" fill="currentColor"
+              fill-opacity="0.3"></path>
         <g id="sound-waves" hidden>
-          <path d="M16 9.2a4 4 0 0 1 0 5.6"></path>
-          <path d="M18.6 6.6a7.5 7.5 0 0 1 0 10.8"></path>
+          <path d="M15.4 9.3a3.8 3.8 0 0 1 0 5.4"></path>
+          <path d="M18.1 6.8a7.2 7.2 0 0 1 0 10.4"></path>
         </g>
-        <g id="sound-cross">
-          <path d="M16.5 10l5 4"></path>
-          <path d="M21.5 10l-5 4"></path>
-        </g>
+        <path id="sound-slash" d="M20.5 3.5 4.5 20.5"></path>
       </svg>
     </button>
   </div>
@@ -398,6 +407,11 @@
     var hint = document.getElementById("hint");
     var bar = document.getElementById("bar");
 
+    function setHidden(element, hide) {
+      if (hide) element.setAttribute("hidden", "");
+      else element.removeAttribute("hidden");
+    }
+
     function fail(message) {
       stage.textContent = "Could not start";
       bar.parentNode.hidden = true;
@@ -430,7 +444,7 @@
       // nothing is worse than no button.
       var sound = document.getElementById("sound");
       var waves = document.getElementById("sound-waves");
-      var cross = document.getElementById("sound-cross");
+      var slash = document.getElementById("sound-slash");
       var soundOn = false;
 
       // The player starts silent: a page that makes noise before being asked is a
@@ -445,8 +459,10 @@
         sound.setAttribute("aria-pressed", String(soundOn));
         sound.title = soundOn ? "Sound on" : "Sound off";
         sound.setAttribute("aria-label", sound.title);
-        waves.hidden = !soundOn;
-        cross.hidden = soundOn;
+        // SVG elements have no `hidden` property — assigning one silently does nothing,
+        // so the attribute has to be set directly for the CSS [hidden] rule to bite.
+        setHidden(waves, !soundOn);
+        setHidden(slash, soundOn);
       });
 
       var button = document.getElementById("fullscreen");

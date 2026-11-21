@@ -632,6 +632,13 @@ namespace EgyptianSlot.EditorTools
             source.playOnAwake = false;
             SetPrivateField(audio, "_source", source);
 
+            // The scene is built empty, which leaves out the default camera and with it
+            // the AudioListener. Unity plays nothing without one, and nothing else in a
+            // screen-space-overlay scene misses a camera, so the gap is silent in both
+            // senses: no warning, no sound.
+            if (Object.FindFirstObjectByType<AudioListener>() == null)
+                audio.gameObject.AddComponent<AudioListener>();
+
             Debug.Log("[SlotSceneBuilder] Audio wired: " +
                       string.Join(", ", clips.Select(pair => $"{pair.Key}={pair.Value.Count}")));
         }
