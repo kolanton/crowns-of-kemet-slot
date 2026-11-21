@@ -49,6 +49,27 @@
     gap: 28px;
   }
 
+  .notice {
+    border: 1px solid var(--edge);
+    border-left: 3px solid var(--gold);
+    border-radius: 3px;
+    padding: 12px 16px;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--ink-dim);
+    margin: 0;
+  }
+
+  .notice b {
+    display: block;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    color: var(--gold);
+    margin-bottom: 4px;
+  }
+
   header {
     display: flex;
     flex-direction: column;
@@ -253,11 +274,23 @@
 <body>
 
 <div class="page">
+  <p class="notice">
+    <b>Demonstration build — not a gambling product</b>
+    This is a technical prototype of slot mechanics, not a published game and not a
+    real-money product. It uses play-money credits with no monetary value: there is no
+    wagering, no deposit, no purchase and no payout, and credits cannot be bought,
+    redeemed or withdrawn. Outcomes come from an uncertified pseudorandom generator
+    running in your browser; the paytable is illustrative and no return-to-player
+    percentage has been calculated, audited or certified by any gaming authority. Not
+    operated by, affiliated with or endorsed by any casino, operator or licensee.
+  </p>
+
   <header>
     <h1>Crowns of Kemet</h1>
     <p class="standfirst">
-      A five-reel, ten-line slot built in Unity around RetroStyle Games' free Egyptian art pack.
-      Play money only — the wallet resets, nothing is wagered.
+      Five-reel, ten-line slot mechanics built in Unity around RetroStyle Games' free
+      Egyptian art pack: weighted reels, wild substitution, a full-column character and
+      ten fixed paylines.
     </p>
   </header>
 

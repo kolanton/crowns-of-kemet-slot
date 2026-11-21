@@ -2,7 +2,15 @@
 
 A 5x3, ten-line slot machine built in Unity around RetroStyle Games' free
 [Crowns of Kemet](https://assetstore.unity.com/packages/2d/gui/icons/free-egyptian-slot-game-art-symbols-wild-and-anubis-character-396700)
-Egyptian art pack. Play money only — the wallet resets and nothing is wagered.
+Egyptian art pack.
+
+> **Demonstration build — not a gambling product.** A technical prototype of slot
+> mechanics, not a published game and not a real-money product. Play-money credits with
+> no monetary value: no wagering, no deposit, no purchase, no payout, and credits cannot
+> be bought, redeemed or withdrawn. Outcomes come from an uncertified pseudorandom
+> generator running in the browser; the paytable is illustrative and no return-to-player
+> percentage has been calculated, audited or certified. Not operated by, affiliated with
+> or endorsed by any casino, operator or licensee.
 
 **Play it:** see the GitHub Pages link in this repository's About panel.
 
