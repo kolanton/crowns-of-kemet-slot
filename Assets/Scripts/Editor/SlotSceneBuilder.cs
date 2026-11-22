@@ -538,12 +538,24 @@ namespace EgyptianSlot.EditorTools
                 artRect.sizeDelta = FitInto(bannerSprite, 470f, 140f);
             }
 
-            // The figure sits under the artwork, inside the ornament's glow.
-            var amountLabel = NewLabel("Amount", bannerRect, 68, TextAnchor.MiddleCenter);
+            // The figure sits on its own plate. The ornament's brightest feature — the
+            // lotus bulb — falls exactly where a centred number lands, and gold on pale
+            // blue is unreadable there. Enlarging the text did not fix it; giving it a
+            // ground does, whatever happens to be behind.
+            var amountPlate = new GameObject("AmountPlate", typeof(RectTransform), typeof(Image));
+            var amountPlateRect = (RectTransform)amountPlate.transform;
+            amountPlateRect.SetParent(bannerRect, false);
+            amountPlateRect.anchorMin = amountPlateRect.anchorMax = new Vector2(0.5f, 0.5f);
+            amountPlateRect.pivot = new Vector2(0.5f, 0.5f);
+            amountPlateRect.anchoredPosition = new Vector2(0f, -96f);
+            amountPlateRect.sizeDelta = new Vector2(400f, 108f);
+            PaintPlate(amountPlate.GetComponent<Image>(), First(catalog, "packReadout"));
+
+            var amountLabel = NewLabel("Amount", amountPlateRect, 76, TextAnchor.MiddleCenter);
             var amountRect = amountLabel.rectTransform;
-            amountRect.anchorMin = amountRect.anchorMax = new Vector2(0.5f, 0.5f);
-            amountRect.anchoredPosition = new Vector2(0f, -50f);
-            amountRect.sizeDelta = new Vector2(620f, 90f);
+            Stretch(amountRect);
+            amountRect.offsetMin = new Vector2(16f, 6f);
+            amountRect.offsetMax = new Vector2(-16f, -6f);
             amountLabel.color = Gold;
             amountLabel.text = "0";
 

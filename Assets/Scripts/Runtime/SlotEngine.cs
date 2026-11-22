@@ -123,6 +123,63 @@ namespace EgyptianSlot
             return result;
         }
 
+        /// <summary>
+        /// Rolls a grid rigged to pay well: the first payline is filled with the highest
+        /// paying ordinary symbol, and every other cell is left to chance. Five of the top
+        /// symbol pays many times the stake, which clears the big-win threshold on any
+        /// bet level.
+        ///
+        /// This exists only so the big-win presentation can be demonstrated without
+        /// waiting on the odds. It is not how the machine behaves otherwise.
+        /// </summary>
+        public SpinResult SpinWithForcedBigWin(int lineBet)
+        {
+            var result = new SpinResult
+            {
+                Grid = new int[_config.ReelCount, _config.RowCount],
+                TotalBet = _config.TotalBet(lineBet),
+            };
+
+            for (int reel = 0; reel < _config.ReelCount; reel++)
+                for (int row = 0; row < _config.RowCount; row++)
+                    result.Grid[reel, row] = RandomCellSymbolIndex();
+
+            int top = HighestPayingSymbol();
+            if (top >= 0 && _config.Paylines.Count > 0)
+            {
+                var line = _config.Paylines[0];
+                for (int reel = 0; reel < _config.ReelCount && reel < line.Rows.Length; reel++)
+                    result.Grid[reel, line.Rows[reel]] = top;
+            }
+
+            Evaluate(result, lineBet);
+            return result;
+        }
+
+        /// <summary>
+        /// The ordinary symbol with the largest five-of-a-kind payout. Wilds and scatters
+        /// are skipped: a wild line is a special case and a scatter forms no line at all.
+        /// </summary>
+        private int HighestPayingSymbol()
+        {
+            int best = -1;
+            int bestPay = 0;
+
+            for (int i = 0; i < _config.Symbols.Count; i++)
+            {
+                var symbol = _config.Symbols[i];
+                if (symbol.IsWild || symbol.IsScatter || symbol.IsFullColumn) continue;
+
+                int pay = symbol.LinePayFor(_config.ReelCount);
+                if (pay <= bestPay) continue;
+
+                bestPay = pay;
+                best = i;
+            }
+
+            return best;
+        }
+
         /// <summary>Scores an already-populated grid. Public so a fixed grid can be scored in tests.</summary>
         public void Evaluate(SpinResult result, int lineBet)
         {

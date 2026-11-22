@@ -38,6 +38,9 @@ namespace EgyptianSlot
         private int _balance;
         private int _lineBetIndex;
         private int _reelsStillSpinning;
+
+        /// <summary>Spins taken since the last forced win, for the demo rig.</summary>
+        private int _spinsSinceForcedWin;
         private bool _isSpinning;
         private bool _autoplay;
 
@@ -136,7 +139,17 @@ namespace EgyptianSlot
             for (int reel = 0; reel < _reels.Length; reel++)
                 _reels[reel].Spin(_baseTravelCells + _travelPerReel * reel);
 
-            var result = _engine.Spin(LineBet);
+            // Every Nth spin is rigged to pay well, so the big-win presentation can be
+            // seen on demand. Set ForcedBigWinEverySpins to 0 to leave it all to chance.
+            _spinsSinceForcedWin++;
+            bool force = _config.ForcedBigWinEverySpins > 0
+                         && _spinsSinceForcedWin >= _config.ForcedBigWinEverySpins;
+
+            if (force) _spinsSinceForcedWin = 0;
+
+            var result = force
+                ? _engine.SpinWithForcedBigWin(LineBet)
+                : _engine.Spin(LineBet);
 
             var column = new int[_config.RowCount];
             for (int reel = 0; reel < _reels.Length; reel++)

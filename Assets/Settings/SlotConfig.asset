@@ -100,5 +100,6 @@ MonoBehaviour:
   - Name: Wave
     Rows: 0100000002000000010000000000000001000000i
     HighlightColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  ForcedBigWinEverySpins: 5
   StartingBalance: 1000
   LineBets: 0100000002000000050000000a00000019000000i

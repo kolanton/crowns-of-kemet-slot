@@ -13,7 +13,10 @@ Egyptian art pack.
 > on a phone. Play-money credits with
 > no monetary value: no wagering, no deposit, no purchase, no payout, and credits cannot
 > be bought, redeemed or withdrawn. Outcomes come from an uncertified pseudorandom
-> generator running in the browser; the paytable is illustrative and no return-to-player
+> generator running in the browser **and are deliberately rigged**: every fifth spin is
+> forced to pay a large win, so the win presentation can be demonstrated on demand
+> (`SlotConfig.ForcedBigWinEverySpins`; set it to 0 to leave every spin to chance).
+> The paytable is illustrative and no return-to-player
 > percentage has been calculated, audited or certified. Not operated by, affiliated with
 > or endorsed by any casino, operator or licensee.
 

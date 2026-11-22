@@ -21,6 +21,12 @@ namespace EgyptianSlot
         [Tooltip("One entry per line. Each holds a row index per reel, left to right.")]
         public List<Payline> Paylines = new();
 
+        [Header("Demo")]
+        [Tooltip("Force a large win every N spins so the big-win presentation can be seen " +
+                 "without waiting on chance. 0 leaves every spin to the generator. This " +
+                 "makes outcomes scripted rather than random, which the page must say.")]
+        [Min(0)] public int ForcedBigWinEverySpins = 5;
+
         [Header("Wallet")]
         public int StartingBalance = 1000;
         [Tooltip("Selectable coin amounts staked on every active payline.")]
