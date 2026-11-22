@@ -13,9 +13,20 @@ namespace EgyptianSlot
     {
         [Header("Scene references")]
         [SerializeField] private Text _winLabel;
+
+        [Tooltip("Plate behind the win text. Gold on a sunlit background is unreadable, so " +
+                 "the figure carries its own dark ground, shown only when there is a win.")]
+        [SerializeField] private GameObject _winBacking;
         [SerializeField] private CanvasGroup _bigWinBanner;
         [SerializeField] private Text _bigWinLabel;
+
+        [Tooltip("The figure under the BIG WIN artwork. The pack's own numerals are in its " +
+                 "paid edition, so this is set in the project's display face instead.")]
+        [SerializeField] private Text _bigWinAmount;
         [SerializeField] private SlotAudio _audio;
+
+        [Tooltip("Told to stand its prompt down while a win is displayed; they share a strip.")]
+        [SerializeField] private SlotHud _hud;
 
         [Header("Line cycling")]
         [Tooltip("Seconds each winning line is held before the next is shown.")]
@@ -37,14 +48,28 @@ namespace EgyptianSlot
         public void Clear()
         {
             RestoreDimmed();
-            if (_winLabel != null) _winLabel.text = string.Empty;
+            SetWinText(string.Empty);
             if (_bigWinBanner != null) _bigWinBanner.alpha = 0f;
+
+            if (_hud == null) return;
+            _hud.SuppressMessage(false);
+            _hud.SetWin(0);
         }
 
         public void ShowNoWin()
         {
             RestoreDimmed();
-            if (_winLabel != null) _winLabel.text = string.Empty;
+            SetWinText(string.Empty);
+        }
+
+        /// <summary>
+        /// Sets the win readout, showing its plate only when there is something to read.
+        /// An empty plate sitting under the reels between spins would read as chrome.
+        /// </summary>
+        private void SetWinText(string text)
+        {
+            if (_winLabel != null) _winLabel.text = text;
+            if (_winBacking != null) _winBacking.SetActive(!string.IsNullOrEmpty(text));
         }
 
         /// <summary>
@@ -53,20 +78,28 @@ namespace EgyptianSlot
         /// </summary>
         public IEnumerator Present(SpinResult result, ReelView[] reels, SlotConfig config, SlotEngine engine)
         {
-            if (_winLabel != null) _winLabel.text = $"WIN {result.TotalWin}";
+            if (_hud != null)
+            {
+                _hud.SuppressMessage(true);
+                _hud.SetWin(result.TotalWin);
+            }
 
+            // The total lives in the bar's win field. This strip carries only the
+            // breakdown, line by line, and clears itself afterwards.
             float multiplier = result.WinMultiplier;
             int tier = -1;
             for (int i = 0; i < _tierThresholds.Length; i++)
                 if (multiplier >= _tierThresholds[i]) tier = i;
 
-            if (tier >= 0) yield return ShowBanner(_tierNames[Mathf.Min(tier, _tierNames.Length - 1)]);
+            if (tier >= 0)
+                yield return ShowBanner(_tierNames[Mathf.Min(tier, _tierNames.Length - 1)],
+                    result.TotalWin);
 
             foreach (var scatter in result.ScatterWins)
             {
                 if (_winLabel == null) break;
                 var symbol = config.Symbols[scatter.SymbolIndex];
-                _winLabel.text = $"{scatter.Count}x {symbol.DisplayName}  +{scatter.Payout}";
+                SetWinText($"{scatter.Count}x {symbol.DisplayName}  +{scatter.Payout}");
                 yield return new WaitForSeconds(_lineHoldDuration);
             }
 
@@ -81,33 +114,54 @@ namespace EgyptianSlot
                 {
                     var symbol = config.Symbols[win.SymbolIndex];
                     string wild = win.UsedWild ? " (wild)" : string.Empty;
-                    _winLabel.text = $"{win.MatchCount}x {symbol.DisplayName}{wild}  +{win.Payout}";
+                    SetWinText($"{win.MatchCount}x {symbol.DisplayName}{wild}  +{win.Payout}");
                 }
 
                 yield return new WaitForSeconds(_lineHoldDuration);
             }
 
             RestoreDimmed();
-            if (_winLabel != null) _winLabel.text = $"WIN {result.TotalWin}";
+            SetWinText(string.Empty);
+
+            // The prompt comes back once the breakdown has finished; the bar keeps the
+            // figure until the next spin.
+            if (_hud != null) _hud.SuppressMessage(false);
         }
 
-        private IEnumerator ShowBanner(string text)
+        private IEnumerator ShowBanner(string text, int amount)
         {
             if (_bigWinBanner == null) yield break;
 
             if (_audio != null) _audio.PlayBigWin();
             if (_bigWinLabel != null) _bigWinLabel.text = text;
 
-            const float fade = 0.25f;
-            const float hold = 1.1f;
+            const float fade = 0.3f;
+            const float countUp = 0.9f;
+            const float hold = 0.9f;
 
             for (float t = 0f; t < fade; t += Time.deltaTime)
             {
                 _bigWinBanner.alpha = t / fade;
+                if (_bigWinAmount != null) _bigWinAmount.text = "0";
                 yield return null;
             }
 
             _bigWinBanner.alpha = 1f;
+
+            // The figure counts up rather than appearing. A big win is the one moment
+            // worth drawing out, and a number that climbs is what makes it feel earned.
+            if (_bigWinAmount != null)
+            {
+                for (float t = 0f; t < countUp; t += Time.deltaTime)
+                {
+                    float eased = 1f - (1f - t / countUp) * (1f - t / countUp);
+                    _bigWinAmount.text = Mathf.RoundToInt(amount * eased).ToString("N0");
+                    yield return null;
+                }
+
+                _bigWinAmount.text = amount.ToString("N0");
+            }
+
             yield return new WaitForSeconds(hold);
 
             for (float t = 0f; t < fade; t += Time.deltaTime)

@@ -55,6 +55,13 @@ namespace EgyptianSlot.EditorTools
         private const float BarContentY = -12f;
 
         /// <summary>
+        /// Height above the canvas's bottom edge of the strip that carries the win total
+        /// and the prompt. It sits clear of the control bar below and the grid above,
+        /// which leaves about 58 units — room for one line, not two.
+        /// </summary>
+        private const float MessageStripY = 158f;
+
+        /// <summary>
         /// Symbol value ranking, low to high, matched by filename substring. The pack ships
         /// four mid-tier symbols with no inherent order, so the paytable needs one stated.
         /// Anything unlisted keeps its catalogue position, after the listed ones.
@@ -126,6 +133,7 @@ namespace EgyptianSlot.EditorTools
             SetPrivateField(machine, "_audio", audio);
             SetPrivateField(hud, "_audio", audio);
             SetPrivateField(winPresenter, "_audio", audio);
+            SetPrivateField(winPresenter, "_hud", hud);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -473,17 +481,42 @@ namespace EgyptianSlot.EditorTools
 
         private static WinPresenter CreateWinPresenter(Canvas canvas, Dictionary<string, List<Sprite>> catalog)
         {
-            var winLabel = NewLabel("WinLabel", canvas.transform, 36, TextAnchor.MiddleCenter);
+            // Anchored to the bottom rather than the centre, in the strip between the
+            // grid's lower edge and the top of the control bar. Measured from the bar so
+            // it cannot end up half behind it, which is what a centre-relative offset did.
+            // The figure gets the same plate as the HUD readouts. Gold type straight over
+            // sunlit sandstone is close to unreadable, and the plate's dark interior is
+            // what the rest of the bar already relies on.
+            var winPlateSprite = First(catalog, "packReadout");
+            var winBacking = new GameObject("WinReadout", typeof(RectTransform), typeof(Image));
+            var backingRect = (RectTransform)winBacking.transform;
+            backingRect.SetParent(canvas.transform, false);
+            backingRect.anchorMin = backingRect.anchorMax = new Vector2(0.5f, 0f);
+            backingRect.pivot = new Vector2(0.5f, 0.5f);
+            backingRect.anchoredPosition = new Vector2(0f, MessageStripY);
+            backingRect.sizeDelta = new Vector2(380f, 58f);
+            PaintPlate(winBacking.GetComponent<Image>(), winPlateSprite);
+
+            var winLabel = NewLabel("WinLabel", backingRect, 34, TextAnchor.MiddleCenter);
             var winRect = winLabel.rectTransform;
-            winRect.anchorMin = winRect.anchorMax = new Vector2(0.5f, 0.5f);
-            winRect.anchoredPosition = new Vector2(0f, -220f);
-            winRect.sizeDelta = new Vector2(760f, 52f);
+            Stretch(winRect);
+            winRect.offsetMin = new Vector2(14f, 2f);
+            winRect.offsetMax = new Vector2(-14f, -2f);
             winLabel.color = Gold;
+
+            // Hidden until there is a win; the presenter shows it with the text.
+            winBacking.SetActive(false);
 
             var bannerGo = new GameObject("BigWinBanner", typeof(RectTransform), typeof(CanvasGroup));
             var bannerRect = (RectTransform)bannerGo.transform;
             bannerRect.SetParent(canvas.transform, false);
             Stretch(bannerRect);
+
+            // A dim over the whole scene, as the pack's own mock-up does it. Without it
+            // the pop-up competes with the reels behind rather than interrupting them.
+            var scrim = NewImage("Scrim", bannerRect, null);
+            Stretch(scrim.rectTransform);
+            scrim.color = new Color(0.03f, 0.02f, 0.05f, 0.66f);
 
             var decorSprite = First(catalog, "bigwinDecor");
             if (decorSprite != null)
@@ -491,8 +524,8 @@ namespace EgyptianSlot.EditorTools
                 var decor = NewImage("Decor", bannerRect, decorSprite);
                 var decorRect = decor.rectTransform;
                 decorRect.anchorMin = decorRect.anchorMax = new Vector2(0.5f, 0.5f);
-                decorRect.anchoredPosition = new Vector2(0f, -30f);
-                decorRect.sizeDelta = FitInto(decorSprite, 520f, 410f);
+                decorRect.anchoredPosition = new Vector2(0f, -10f);
+                decorRect.sizeDelta = FitInto(decorSprite, 620f, 500f);
             }
 
             var bannerSprite = First(catalog, "bigwin");
@@ -501,9 +534,18 @@ namespace EgyptianSlot.EditorTools
                 var art = NewImage("Art", bannerRect, bannerSprite);
                 var artRect = art.rectTransform;
                 artRect.anchorMin = artRect.anchorMax = new Vector2(0.5f, 0.5f);
-                artRect.anchoredPosition = new Vector2(0f, 40f);
-                artRect.sizeDelta = FitInto(bannerSprite, 820f, 300f);
+                artRect.anchoredPosition = new Vector2(0f, 60f);
+                artRect.sizeDelta = FitInto(bannerSprite, 470f, 140f);
             }
+
+            // The figure sits under the artwork, inside the ornament's glow.
+            var amountLabel = NewLabel("Amount", bannerRect, 68, TextAnchor.MiddleCenter);
+            var amountRect = amountLabel.rectTransform;
+            amountRect.anchorMin = amountRect.anchorMax = new Vector2(0.5f, 0.5f);
+            amountRect.anchoredPosition = new Vector2(0f, -50f);
+            amountRect.sizeDelta = new Vector2(620f, 90f);
+            amountLabel.color = Gold;
+            amountLabel.text = "0";
 
             var bannerLabel = NewLabel("Label", bannerRect, 90, TextAnchor.MiddleCenter);
             Stretch(bannerLabel.rectTransform);
@@ -516,8 +558,10 @@ namespace EgyptianSlot.EditorTools
 
             var presenter = canvas.gameObject.AddComponent<WinPresenter>();
             SetPrivateField(presenter, "_winLabel", winLabel);
+            SetPrivateField(presenter, "_winBacking", winBacking);
             SetPrivateField(presenter, "_bigWinBanner", bannerGo.GetComponent<CanvasGroup>());
             SetPrivateField(presenter, "_bigWinLabel", bannerLabel);
+            SetPrivateField(presenter, "_bigWinAmount", amountLabel);
 
             return presenter;
         }
@@ -586,7 +630,9 @@ namespace EgyptianSlot.EditorTools
             // landscape instead of drifting toward the middle.
             NewPlate(barRect, "Coins", 36f, 204f, "COINS", plate, out var balanceValue,
                 fromRight: true);
-            NewPlate(barRect, "LineBet", 254f, 150f, "LINE BET", plate, out var lineBetValue,
+            // WIN sits beside the wallet, where a machine puts it: a fixed field reading
+            // zero between spins, so the figure always appears in the same place.
+            NewPlate(barRect, "Win", 254f, 150f, "WIN", plate, out var winValue,
                 fromRight: true);
 
             // Added last so it draws over both plates, and lifted so it rides above the
@@ -608,18 +654,20 @@ namespace EgyptianSlot.EditorTools
             resetRect.anchoredPosition = new Vector2(-18f, -18f);
             resetRect.sizeDelta = new Vector2(112f, 54f);
 
+            // The same strip as the win total. They never show together: the presenter
+            // stands this prompt down while a win is on screen.
             var message = NewLabel("Message", canvas.transform, 22, TextAnchor.MiddleCenter);
             var messageRect = message.rectTransform;
             messageRect.anchorMin = messageRect.anchorMax = new Vector2(0.5f, 0f);
-            messageRect.pivot = new Vector2(0.5f, 0f);
-            messageRect.anchoredPosition = new Vector2(0f, BarHeight + 10f);
+            messageRect.pivot = new Vector2(0.5f, 0.5f);
+            messageRect.anchoredPosition = new Vector2(0f, MessageStripY);
             messageRect.sizeDelta = new Vector2(620f, 30f);
             message.color = new Color(1f, 1f, 1f, 0.55f);
 
             var hud = canvas.gameObject.AddComponent<SlotHud>();
             SetPrivateField(hud, "_betLabel", betValue);
             SetPrivateField(hud, "_levelLabel", levelValue);
-            SetPrivateField(hud, "_lineBetLabel", lineBetValue);
+            SetPrivateField(hud, "_winValueLabel", winValue);
             SetPrivateField(hud, "_balanceLabel", balanceValue);
             SetPrivateField(hud, "_messageLabel", message);
             SetPrivateField(hud, "_spinButton", spinButton);

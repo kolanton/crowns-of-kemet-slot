@@ -91,7 +91,11 @@ namespace EgyptianSlot.EditorTools
             // Keep thrown exceptions reportable. Without them a failure in the player is
             // perfectly silent — no console entry, nothing on screen, just a scene that
             // stops responding — which costs far more than the size this saves.
-            PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly;
+            // Full checks, no stack traces. "Explicitly thrown only" hides null references
+            // and bad indexes — the two that actually break a coroutine — and chasing one
+            // of those blind cost more than this setting ever will. The stack traces are
+            // the expensive part, so they are the part dropped.
+            PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.FullWithoutStacktrace;
             PlayerSettings.WebGL.dataCaching = true;
 
             // The stock minimal template: a bare canvas and loader, no Unity logo or

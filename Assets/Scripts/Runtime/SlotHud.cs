@@ -16,7 +16,9 @@ namespace EgyptianSlot
         [Header("Readouts")]
         [SerializeField] private Text _betLabel;
         [SerializeField] private Text _levelLabel;
-        [SerializeField] private Text _lineBetLabel;
+        [Tooltip("The win field in the bar: a permanent home for the figure, reading zero " +
+                 "between spins, rather than text that appears in whatever gap is free.")]
+        [SerializeField] private Text _winValueLabel;
         [SerializeField] private Text _balanceLabel;
         [SerializeField] private Text _messageLabel;
 
@@ -41,6 +43,29 @@ namespace EgyptianSlot
         [SerializeField] private SlotAudio _audio;
 
         private SlotMachineController _controller;
+
+        /// <summary>
+        /// Set while a win is on screen. The prompt and the win total share one strip
+        /// between the reels and the bar — there is no room for both — so the prompt
+        /// stands down rather than printing over the figure the player wants to read.
+        /// </summary>
+        private bool _messageSuppressed;
+
+        /// <summary>What the win field shows. Held until the next spin clears it.</summary>
+        private int _lastWin;
+
+        /// <summary>Sets the bar's win field. Zero between spins.</summary>
+        public void SetWin(int amount)
+        {
+            _lastWin = amount;
+            Refresh();
+        }
+
+        public void SuppressMessage(bool suppress)
+        {
+            _messageSuppressed = suppress;
+            Refresh();
+        }
 
         /// <summary>Called once by the controller, which owns the lifetime of the pair.</summary>
         public void Bind(SlotMachineController controller)
@@ -82,7 +107,7 @@ namespace EgyptianSlot
 
             if (_betLabel != null) _betLabel.text = _controller.TotalBet.ToString("N0");
             if (_levelLabel != null) _levelLabel.text = _controller.Level.ToString();
-            if (_lineBetLabel != null) _lineBetLabel.text = _controller.LineBet.ToString("N0");
+            if (_winValueLabel != null) _winValueLabel.text = _lastWin.ToString("N0");
             if (_balanceLabel != null) _balanceLabel.text = _controller.Balance.ToString("N0");
 
             if (_spinButton != null) _spinButton.interactable = _controller.CanSpin();
@@ -117,6 +142,12 @@ namespace EgyptianSlot
                 _autoplayLabel.text = _controller.AutoplayEnabled ? "STOP\nAUTO" : "AUTO\nPLAY";
 
             if (_messageLabel == null) return;
+
+            if (_messageSuppressed)
+            {
+                _messageLabel.text = string.Empty;
+                return;
+            }
 
             bool broke = !spinning && _controller.Balance < _controller.TotalBet;
             _messageLabel.text = broke
