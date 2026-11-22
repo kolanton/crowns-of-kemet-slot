@@ -34,6 +34,16 @@ namespace EgyptianSlot
         [Tooltip("Dim applied to cells outside the line currently being shown.")]
         [Range(0f, 1f)][SerializeField] private float _dimAlpha = 0.25f;
 
+        [Header("Skipping")]
+        [Tooltip("Lets a press cut the presentation short. A five-line win otherwise holds " +
+                 "the machine for several seconds, and input that is merely ignored reads " +
+                 "as a freeze rather than as a pause.")]
+        [SerializeField] private bool _skippable = true;
+
+        [Tooltip("Presses are ignored for this long after a win appears. Without it, " +
+                 "someone hammering SPIN would skip every banner before seeing it.")]
+        [SerializeField] private float _skipGrace = 0.35f;
+
         [Header("Win tiers")]
         [Tooltip("Stake multiples at which the banner reads Big Win, Mega Win and Epic Win.")]
         [SerializeField] private float[] _tierThresholds = { 10f, 25f, 60f };
@@ -42,13 +52,51 @@ namespace EgyptianSlot
         private readonly List<Vector2Int> _cells = new();
         private readonly List<Image> _dimmed = new();
 
+        /// <summary>Latches for the rest of a presentation once the player asks to skip.</summary>
+        private bool _skipRequested;
+
+        /// <summary>Time from which presses count, so the grace period can be enforced.</summary>
+        private float _skipArmsAt;
+
         private void Awake() => Clear();
+
+        /// <summary>
+        /// True once the player has asked to get on with it. One press ends the whole
+        /// breakdown rather than advancing it a line at a time: someone who wants out of a
+        /// five-line cycle does not want to press five times, and the total is already
+        /// sitting in the bar regardless.
+        /// </summary>
+        private bool Skipping()
+        {
+            if (_skipRequested) return true;
+            if (!_skippable || Time.time < _skipArmsAt) return false;
+
+            bool pressed = Input.GetMouseButtonDown(0)
+                           || Input.GetKeyDown(KeyCode.Space)
+                           || Input.GetKeyDown(KeyCode.Return)
+                           || Input.GetKeyDown(KeyCode.Escape)
+                           || (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began);
+
+            if (pressed) _skipRequested = true;
+            return _skipRequested;
+        }
+
+        /// <summary>A wait that ends early, and stays ended, when the player presses.</summary>
+        private IEnumerator Hold(float seconds)
+        {
+            for (float t = 0f; t < seconds; t += Time.deltaTime)
+            {
+                if (Skipping()) yield break;
+                yield return null;
+            }
+        }
 
         /// <summary>Resets the labels and undims anything a previous spin left dimmed.</summary>
         public void Clear()
         {
             RestoreDimmed();
             SetWinText(string.Empty);
+            _skipRequested = false;
             if (_bigWinBanner != null) _bigWinBanner.alpha = 0f;
 
             if (_hud == null) return;
@@ -78,6 +126,9 @@ namespace EgyptianSlot
         /// </summary>
         public IEnumerator Present(SpinResult result, ReelView[] reels, SlotConfig config, SlotEngine engine)
         {
+            _skipRequested = false;
+            _skipArmsAt = Time.time + _skipGrace;
+
             if (_hud != null)
             {
                 _hud.SuppressMessage(true);
@@ -98,13 +149,16 @@ namespace EgyptianSlot
             foreach (var scatter in result.ScatterWins)
             {
                 if (_winLabel == null) break;
+                if (_skipRequested) break;
                 var symbol = config.Symbols[scatter.SymbolIndex];
                 SetWinText($"{scatter.Count}x {symbol.DisplayName}  +{scatter.Payout}");
-                yield return new WaitForSeconds(_lineHoldDuration);
+                yield return Hold(_lineHoldDuration);
             }
 
             foreach (var win in result.LineWins)
             {
+                if (_skipRequested) break;
+
                 engine.CellsForLineWin(win, _cells);
                 HighlightOnly(_cells, reels, config);
 
@@ -117,7 +171,7 @@ namespace EgyptianSlot
                     SetWinText($"{win.MatchCount}x {symbol.DisplayName}{wild}  +{win.Payout}");
                 }
 
-                yield return new WaitForSeconds(_lineHoldDuration);
+                yield return Hold(_lineHoldDuration);
             }
 
             RestoreDimmed();
@@ -141,6 +195,7 @@ namespace EgyptianSlot
 
             for (float t = 0f; t < fade; t += Time.deltaTime)
             {
+                if (Skipping()) break;
                 _bigWinBanner.alpha = t / fade;
                 if (_bigWinAmount != null) _bigWinAmount.text = "0";
                 yield return null;
@@ -150,10 +205,12 @@ namespace EgyptianSlot
 
             // The figure counts up rather than appearing. A big win is the one moment
             // worth drawing out, and a number that climbs is what makes it feel earned.
+            // A skip lands it on the total at once, which is the thing being waited for.
             if (_bigWinAmount != null)
             {
                 for (float t = 0f; t < countUp; t += Time.deltaTime)
                 {
+                    if (Skipping()) break;
                     float eased = 1f - (1f - t / countUp) * (1f - t / countUp);
                     _bigWinAmount.text = Mathf.RoundToInt(amount * eased).ToString("N0");
                     yield return null;
@@ -162,11 +219,14 @@ namespace EgyptianSlot
                 _bigWinAmount.text = amount.ToString("N0");
             }
 
-            yield return new WaitForSeconds(hold);
+            yield return Hold(hold);
 
-            for (float t = 0f; t < fade; t += Time.deltaTime)
+            // Still a fade on the way out, but a brisk one once skipped: a leisurely
+            // dissolve is exactly what the press was asking to be rid of.
+            float outFade = _skipRequested ? 0.12f : fade;
+            for (float t = 0f; t < outFade; t += Time.deltaTime)
             {
-                _bigWinBanner.alpha = 1f - t / fade;
+                _bigWinBanner.alpha = 1f - t / outFade;
                 yield return null;
             }
 

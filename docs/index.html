@@ -192,6 +192,52 @@
 
   .gate button:disabled { opacity: 0.45; cursor: default; }
 
+  /* Portrait is not a layout the machine can be made to fit: the art is 16:9, so a
+     phone held upright gets the whole thing shrunk rather than rearranged. Say so, and
+     offer the one control that fixes it, instead of serving something unusable. */
+  .rotate {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 18px;
+    text-align: center;
+    background: rgba(13, 10, 14, 0.94);
+  }
+
+  .rotate p { margin: 0; color: var(--ink-dim); font-size: 0.86rem; max-width: 30ch; }
+
+  .rotate button {
+    font-family: var(--display);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-size: 0.74rem;
+    padding: 9px 20px;
+    color: var(--ground);
+    background: var(--gold);
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  /* Only once there is something to cover: in portrait the password form is perfectly
+     usable, and an overlay over it would lock the page. */
+  @media (orientation: portrait) and (max-width: 860px) {
+    .machine.ready .rotate { display: flex; }
+
+    /* Both overlay the same corner, and in a strip this short they collide with the
+       heading. The notice carries its own fullscreen control, and sound is not worth
+       reaching for until the machine is actually playable. */
+    .machine.ready .fullscreen,
+    .machine.ready .sound { display: none; }
+  }
+
+  /* Never in fullscreen, where it would sit over the only way back out. */
+  .machine:fullscreen .rotate { display: none; }
+
   .fullscreen,
   .sound {
     position: absolute;
@@ -399,6 +445,12 @@
       <div class="meter" id="meter"><span id="bar"></span></div>
       <p id="hint">About 15&nbsp;MB once unlocked, then cached.</p>
     </div>
+    <div class="rotate" id="rotate">
+      <p class="stage">Built for landscape</p>
+      <p>A 16:9 machine inside a portrait phone is a strip about two centimetres tall,
+         with controls to match.</p>
+      <button type="button" id="rotate-go">Play fullscreen</button>
+    </div>
     <button class="fullscreen" id="fullscreen" type="button" title="Fullscreen"
             aria-label="Fullscreen" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"
@@ -462,6 +514,7 @@
       <h2 style="margin-top:24px">Controls</h2>
       <dl>
         <dt><kbd>Space</kbd> <kbd>Enter</kbd></dt><dd>Spin</dd>
+        <dt>Any press during a win</dt><dd>Skip the rest of the breakdown</dd>
         <dt>LEVEL <kbd>&lt;</kbd> <kbd>&gt;</kbd></dt><dd>Step the stake up or down</dd>
         <dt>MAX BET</dt><dd>Jump to the highest stake</dd>
         <dt>AUTO PLAY</dt><dd>Spin until stopped or broke</dd>
@@ -652,6 +705,27 @@
 
         curtain.hidden = true;
         document.getElementById("unity-canvas").focus();
+
+        var machineBox = document.getElementById("machine");
+
+        // Arms the portrait notice. Before this there is a password form on screen,
+        // which is perfectly usable upright and must not be covered.
+        machineBox.classList.add("ready");
+
+        // Fullscreen is the one thing that rescues portrait, and on Android it can take
+        // the orientation with it. iOS refuses the lock, so the notice still stands
+        // there and the request is allowed to fail quietly.
+        document.getElementById("rotate-go").addEventListener("click", function () {
+          var request = machineBox.requestFullscreen
+            ? machineBox.requestFullscreen()
+            : Promise.reject();
+
+          Promise.resolve(request).then(function () {
+            if (screen.orientation && screen.orientation.lock) {
+              return screen.orientation.lock("landscape");
+            }
+          }).catch(function () {});
+        });
 
         // Offered only once the player exists, and only where the browser will grant it:
         // some embedded views refuse fullscreen outright, and a button that silently does

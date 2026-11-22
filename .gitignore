@@ -44,3 +44,6 @@ Assets/Casual Game Sounds U6.meta
 
 # Packaged build for upload to a gated host; regenerate from docs/ as needed.
 /crowns-of-kemet-web.zip
+
+# Scratch copy of the site, encrypted with a throwaway password for local testing.
+/.test-site/
