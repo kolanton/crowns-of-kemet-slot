@@ -1,0 +1,25 @@
+{
+    "version":  1,
+    "cipher":  "AES-256-CBC, then HMAC-SHA-256 over iv||ciphertext",
+    "kdf":  {
+                "name":  "PBKDF2",
+                "hash":  "SHA-256",
+                "iterations":  310000,
+                "salt":  "zfbSVicMUz1OU8AZurosfw=="
+            },
+    "check":  "SM3M1g0Aga2rWRHzwtH388bPpZD4iMhvNd265JNJpq0=",
+    "files":  {
+                  "data":  {
+                               "path":  "WebGL.data.enc",
+                               "bytes":  8024208
+                           },
+                  "framework":  {
+                                    "path":  "WebGL.framework.js.enc",
+                                    "bytes":  74880
+                                },
+                  "code":  {
+                               "path":  "WebGL.wasm.enc",
+                               "bytes":  7113776
+                           }
+              }
+}
