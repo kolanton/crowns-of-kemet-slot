@@ -302,13 +302,21 @@ namespace EgyptianSlot.EditorTools
             }
             else
             {
-                // The pack's background is square. Stretching it to a 16:9 canvas would
-                // widen the art by nearly half again, so it is sized to cover instead:
-                // as wide as the canvas, square, with the overflow cropped top and bottom.
+                // The pack's background is square and the canvas never is, so it has to
+                // cover rather than fit: stretching it would widen the art by half again,
+                // and a fixed size leaves bare edges as soon as the screen is wider than
+                // it was sized for — which a phone held sideways always is.
+                //
+                // Envelope mode keeps the art's own proportions and grows it until it
+                // covers the canvas, cropping the overflow, at any aspect.
                 var backgroundRect = image.rectTransform;
-                backgroundRect.anchorMin = backgroundRect.anchorMax = new Vector2(0.5f, 0.5f);
-                backgroundRect.pivot = new Vector2(0.5f, 0.5f);
-                backgroundRect.sizeDelta = new Vector2(ReferenceWidth, ReferenceWidth);
+                Stretch(backgroundRect);
+
+                var fitter = image.gameObject.AddComponent<AspectRatioFitter>();
+                fitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+                fitter.aspectRatio = sprite.rect.height > 0f
+                    ? sprite.rect.width / sprite.rect.height
+                    : 1f;
             }
 
             var logo = First(catalog, "logo");
@@ -569,13 +577,17 @@ namespace EgyptianSlot.EditorTools
             const float buttonHeight = 72f;
             const float discDiameter = 104f;
 
-            var autoButton = NewPlateButton(barRect, "AutoPlay", 524f, buttonWidth, buttonHeight,
+            var autoButton = NewPlateButton(barRect, "AutoPlay", -116f, buttonWidth, buttonHeight,
                 "AUTO\nPLAY", buttonPlate, out var autoLabel, buttonCaption);
-            var maxBetButton = NewPlateButton(barRect, "MaxBet", 756f, buttonWidth, buttonHeight,
+            var maxBetButton = NewPlateButton(barRect, "MaxBet", 116f, buttonWidth, buttonHeight,
                 "MAX\nBET", buttonPlate, out _, buttonCaption, mirrored: packButton != null);
 
-            NewPlate(barRect, "LineBet", 876f, 150f, "LINE BET", plate, out var lineBetValue);
-            NewPlate(barRect, "Coins", 1040f, 204f, "COINS", plate, out var balanceValue);
+            // Wallet readouts hold the right edge, so they stay put on a wide phone in
+            // landscape instead of drifting toward the middle.
+            NewPlate(barRect, "Coins", 36f, 204f, "COINS", plate, out var balanceValue,
+                fromRight: true);
+            NewPlate(barRect, "LineBet", 254f, 150f, "LINE BET", plate, out var lineBetValue,
+                fromRight: true);
 
             // Added last so it draws over both plates, and lifted so it rides above the
             // line of the bar rather than sitting flush with it.
@@ -687,15 +699,24 @@ namespace EgyptianSlot.EditorTools
         // ---- HUD pieces --------------------------------------------------------------
 
         /// <summary>A plate with a small caption above a large value, anchored from the left.</summary>
+        /// <summary>
+        /// A readout plate. <paramref name="x"/> is measured from the bar's left edge, or
+        /// from its right edge when <paramref name="fromRight"/> is set. The bar stretches
+        /// with the screen, so each plate has to hold on to the edge it belongs near;
+        /// absolute offsets from one side leave the far group adrift on a wide screen and
+        /// off the edge on a narrow one.
+        /// </summary>
         private static RectTransform NewPlate(Transform parent, string name, float x, float width,
-            string caption, Sprite plateSprite, out Text value)
+            string caption, Sprite plateSprite, out Text value, bool fromRight = false)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image));
             var rect = (RectTransform)go.transform;
             rect.SetParent(parent, false);
-            rect.anchorMin = rect.anchorMax = new Vector2(0f, 0.5f);
-            rect.pivot = new Vector2(0f, 0.5f);
-            rect.anchoredPosition = new Vector2(x, BarContentY);
+
+            float edge = fromRight ? 1f : 0f;
+            rect.anchorMin = rect.anchorMax = new Vector2(edge, 0.5f);
+            rect.pivot = new Vector2(edge, 0.5f);
+            rect.anchoredPosition = new Vector2(fromRight ? -x : x, BarContentY);
             rect.sizeDelta = new Vector2(width, PlateHeight);
 
             PaintPlate(go.GetComponent<Image>(), plateSprite);
@@ -731,16 +752,21 @@ namespace EgyptianSlot.EditorTools
         /// pack ships one angled plate, and the pair either side of the spin button are
         /// that shape facing opposite ways.
         /// </summary>
-        private static Button NewPlateButton(Transform parent, string name, float centreX,
+        /// <summary>
+        /// A plate that is a button. <paramref name="offsetFromCentre"/> places it relative
+        /// to the bar's middle, so the spin cluster stays together and centred whatever
+        /// the screen's width.
+        /// </summary>
+        private static Button NewPlateButton(Transform parent, string name, float offsetFromCentre,
             float width, float height, string caption, Sprite plateSprite, out Text label,
             Color? captionColor = null, bool mirrored = false)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
             var rect = (RectTransform)go.transform;
             rect.SetParent(parent, false);
-            rect.anchorMin = rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(centreX, BarContentY);
+            rect.anchoredPosition = new Vector2(offsetFromCentre, BarContentY);
             rect.sizeDelta = new Vector2(width, height);
 
             PaintPlate(go.GetComponent<Image>(), plateSprite, raycast: true);
