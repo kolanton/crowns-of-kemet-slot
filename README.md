@@ -130,6 +130,7 @@ allow them to come from:
 | Asset | Author | Terms |
 | --- | --- | --- |
 | [Crowns of Kemet (FREE)](https://assetstore.unity.com/packages/2d/gui/icons/free-egyptian-slot-game-art-symbols-wild-and-anubis-character-396700) | RetroStyle Games | Unity Asset Store EULA |
+| [FREE Casual Game SFX Pack](https://assetstore.unity.com/packages/audio/sound-fx/free-casual-game-sfx-pack-54116) | Dustyroom | CC0 (delivered via the Asset Store) |
 | [UI SFX Free Pack](https://assetstore.unity.com/packages/audio/sound-fx/ui-sfx-free-pack-245925) | Skril Studio | Unity Asset Store EULA |
 | [Free 6 Desert Tracks Music Pack](https://assetstore.unity.com/packages/audio/music/free-6-desert-tracks-music-pack-338276) | alkakrab | Unity Asset Store EULA |
 
