@@ -120,7 +120,11 @@ namespace EgyptianSlot
             _isSpinning = true;
             _winPresenter.Clear();
 
-            if (_audio != null) _audio.PlaySpin();
+            if (_audio != null)
+            {
+                _audio.PlaySpin();
+                _audio.StartSpinLoop();
+            }
 
             _balance -= TotalBet;
             _hud.Refresh();
@@ -144,6 +148,8 @@ namespace EgyptianSlot
             }
 
             while (_reelsStillSpinning > 0) yield return null;
+
+            if (_audio != null) _audio.StopSpinLoop();
 
             yield return new WaitForSeconds(_preWinDelay);
 

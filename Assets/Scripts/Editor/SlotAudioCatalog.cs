@@ -16,6 +16,16 @@ namespace EgyptianSlot.EditorTools
     /// </summary>
     public static class SlotAudioCatalog
     {
+        /// <summary>
+        /// Folders holding effect clips. Both packs are searched; which clip serves which
+        /// moment is decided by <see cref="Rules"/>, not by which pack it came from.
+        /// </summary>
+        private static readonly string[] EffectRoots =
+        {
+            "Assets/Casual Game Sounds U6",
+            "Assets/UI SFX Free Pack",
+        };
+
         private const string PackRoot = "Assets/UI SFX Free Pack";
 
         /// <summary>
@@ -35,25 +45,39 @@ namespace EgyptianSlot.EditorTools
         /// Event name and the pack folders whose clips suit it, matched by path substring.
         /// A clip may serve more than one event; these are not exclusive.
         /// </summary>
-        private static readonly (string Role, string[] Folders)[] Rules =
+        /// <summary>
+        /// Clips are chosen by measurement, not by name: the casual pack's filenames
+        /// (DM-CGS-nn) say nothing, so each was measured for length, attack and a
+        /// brightness proxy, and picked to suit the moment it plays. The numbers in the
+        /// comments are that brightness figure in Hz — lower is darker.
+        ///
+        /// The whole reason for choosing this way: the first attempt used the UI pack's
+        /// "high pitched" folder for reel stops, at 1000-10000Hz, and it sounded like a
+        /// menu rather than a machine.
+        /// </summary>
+        private static readonly (string Role, string[] Clips)[] Rules =
         {
-            // Recorded physical buttons: the most tactile thing in the pack, so the spin
-            // itself gets them.
-            ("spin", new[] { "/buttons/" }),
+            // 406Hz, 0.22s. One clip for all five reels, so the view varies its pitch
+            // slightly per landing rather than firing the identical sample five times.
+            ("reelStop", new[] { "dm-cgs-03" }),
 
-            // Short and bright, which is what a reel landing needs — five fire in a row
-            // and anything with a tail would smear into the next.
-            ("reelStop", new[] { "/high_pitched/" }),
+            // 467Hz, 0.50s: the same tonal family as the stop but longer-bodied, so
+            // pressing spin reads as its own event.
+            ("spin", new[] { "dm-cgs-02" }),
 
-            // Metal coins. The pack intends them for purchases; for a slot they are the
-            // payout.
-            ("win", new[] { "/purchase/" }),
+            // The only purpose-made loop across both packs. Brighter than the drones that
+            // were the alternative, but it wraps without a seam, which they do not.
+            ("spinLoop", new[] { "slide_loop" }),
 
-            // An affirmative flourish for the moment the banner rises.
-            ("bigWin", new[] { "/ok/" }),
+            // 572Hz, 1.9s: long enough to carry a celebration and still dark.
+            ("bigWin", new[] { "dm-cgs-12" }),
 
-            // Quieter interface clicks for the stake and wallet controls.
-            ("click", new[] { "/cancel/", "/sliders/" }),
+            // 992Hz: light enough not to be mistaken for a reel landing.
+            ("click", new[] { "dm-cgs-27" }),
+
+            // 837Hz. The UI pack's coins were dropped: every one of them measures
+            // 2770-11993Hz, and the brightest is the shrillest clip in either pack.
+            ("win", new[] { "dm-cgs-42" }),
         };
 
         /// <summary>Clips found, keyed by event. Events with no clips are absent.</summary>
@@ -61,32 +85,42 @@ namespace EgyptianSlot.EditorTools
         {
             var catalog = new Dictionary<string, List<AudioClip>>();
 
-            if (!AssetDatabase.IsValidFolder(PackRoot)) return catalog;
+            var roots = EffectRoots.Where(AssetDatabase.IsValidFolder).ToArray();
+            if (roots.Length == 0) return catalog;
 
-            var clips = AssetDatabase.FindAssets("t:AudioClip", new[] { PackRoot })
+            var clips = AssetDatabase.FindAssets("t:AudioClip", roots)
                 .Select(AssetDatabase.GUIDToAssetPath)
                 .Distinct()
                 .Select(path => (path, clip: AssetDatabase.LoadAssetAtPath<AudioClip>(path)))
-                .Where(entry => entry.clip != null);
+                .Where(entry => entry.clip != null)
+                .ToList();
 
-            foreach (var (path, clip) in clips)
+            foreach (var rule in Rules)
             {
-                string haystack = path.ToLowerInvariant().Replace('\\', '/');
-
-                foreach (var rule in Rules)
+                // Ordered by the rule, not by the asset database, so the first clip named
+                // for a role is the one a single-clip role gets.
+                foreach (string token in rule.Clips)
                 {
-                    if (!rule.Folders.Any(haystack.Contains)) continue;
+                    var match = clips.FirstOrDefault(entry =>
+                        entry.clip.name.ToLowerInvariant().Contains(token) ||
+                        entry.path.ToLowerInvariant().Contains(token));
+
+                    if (match.clip == null)
+                    {
+                        Debug.LogWarning($"[SlotAudioCatalog] No clip matching \"{token}\" for " +
+                                         $"{rule.Role}; that slot will be quieter than intended.");
+                        continue;
+                    }
 
                     if (!catalog.TryGetValue(rule.Role, out var list))
                         catalog[rule.Role] = list = new List<AudioClip>();
 
-                    list.Add(clip);
+                    list.Add(match.clip);
                 }
             }
 
-            foreach (var list in catalog.Values)
-                list.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
-
+            // Deliberately not sorted: the rules list each clip in the order it was
+            // chosen, and a single-clip role must get the first one named.
             return catalog;
         }
 
@@ -99,7 +133,7 @@ namespace EgyptianSlot.EditorTools
         {
             var candidates = AssetDatabase.FindAssets("t:AudioClip", new[] { MusicRoot })
                 .Select(AssetDatabase.GUIDToAssetPath)
-                .Where(path => !path.StartsWith(PackRoot))
+                .Where(path => !EffectRoots.Any(path.StartsWith))
                 .Select(path => (path: path.ToLowerInvariant().Replace('\\', '/'),
                                  clip: AssetDatabase.LoadAssetAtPath<AudioClip>(path)))
                 .Where(entry => entry.clip != null && entry.clip.length > 20f)
@@ -127,15 +161,16 @@ namespace EgyptianSlot.EditorTools
         [MenuItem("Egyptian Slot/0c. Apply Web Audio Settings")]
         public static void ApplyWebSettings()
         {
-            if (!AssetDatabase.IsValidFolder(PackRoot))
+            var roots = EffectRoots.Where(AssetDatabase.IsValidFolder).ToArray();
+            if (roots.Length == 0)
             {
-                Debug.LogWarning($"[SlotAudioCatalog] {PackRoot} not found; nothing to set.");
+                Debug.LogWarning("[SlotAudioCatalog] No effect packs found; nothing to set.");
                 return;
             }
 
             int changed = 0;
 
-            foreach (string guid in AssetDatabase.FindAssets("t:AudioClip", new[] { PackRoot }))
+            foreach (string guid in AssetDatabase.FindAssets("t:AudioClip", roots))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 if (AssetImporter.GetAtPath(path) is not AudioImporter importer) continue;

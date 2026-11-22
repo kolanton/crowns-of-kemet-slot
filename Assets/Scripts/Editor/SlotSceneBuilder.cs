@@ -661,6 +661,18 @@ namespace EgyptianSlot.EditorTools
             source.playOnAwake = false;
             SetPrivateField(audio, "_source", source);
 
+            // Reel stops get their own source so varying their pitch cannot bend a win
+            // chime or the music playing at the same time.
+            var reelStopSource = audio.gameObject.AddComponent<AudioSource>();
+            reelStopSource.playOnAwake = false;
+            SetPrivateField(audio, "_reelStopSource", reelStopSource);
+
+            var loopSource = audio.gameObject.AddComponent<AudioSource>();
+            loopSource.playOnAwake = false;
+            loopSource.loop = true;
+            SetPrivateField(audio, "_spinLoopSource", loopSource);
+            SetPrivateField(audio, "_spinLoop", SlotAudioCatalog.For(clips, "spinLoop").FirstOrDefault());
+
             // The scene is built empty, which leaves out the default camera and with it
             // the AudioListener. Unity plays nothing without one, and nothing else in a
             // screen-space-overlay scene misses a camera, so the gap is silent in both
