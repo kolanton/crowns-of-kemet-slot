@@ -12,6 +12,11 @@
 # is anchored to the root rather than matching Build/ at any depth.
 /Build/
 
+# The published build is encrypted (see tools/encrypt-build.ps1). A plaintext one in
+# docs/ would be served next to it and make the password gate pointless, so the
+# unencrypted names can never be committed again.
+/docs/Build/*.unityweb
+
 # Third-party art, redistributable only through the Unity Asset Store.
 # Acquire it free from the store link in README.md, then import it here.
 Assets/RetroStyle Games/
@@ -36,3 +41,6 @@ Assets/Desert Music Pack.meta
 # it free from the link in README.md and import it.
 Assets/Casual Game Sounds U6/
 Assets/Casual Game Sounds U6.meta
+
+# Packaged build for upload to a gated host; regenerate from docs/ as needed.
+/crowns-of-kemet-web.zip

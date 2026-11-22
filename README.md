@@ -20,9 +20,40 @@ Egyptian art pack.
 > percentage has been calculated, audited or certified. Not operated by, affiliated with
 > or endorsed by any casino, operator or licensee.
 
-**Play it:** see the GitHub Pages link in this repository's About panel.
+**Play it:** see the GitHub Pages link in this repository's About panel. The build is
+password-gated — ask me for the password.
 
 Unity **6000.6.0f1**, WebGL, no runtime dependencies.
+
+## The password gate
+
+A static host has no server to check a password against, so a prompt drawn in JavaScript
+would be theatre: the files sit right there, and anyone who opened the network tab would
+walk straight past it. Here the password *is* the key.
+
+`tools/encrypt-build.ps1` derives two keys from the password with PBKDF2-HMAC-SHA256
+(310,000 iterations, random 16-byte salt), encrypts each of the three build files with
+AES-256-CBC under the first, and authenticates each with HMAC-SHA256 under the second,
+over the IV and ciphertext together. Each published file is `iv || ciphertext || tag`.
+`docs/Build/manifest.json` carries the salt, the iteration count and the file list.
+
+The page asks for the password, derives the same two keys in the browser with Web Crypto,
+decrypts the three files into memory and hands Unity blob URLs. Without the password the
+host is serving fifteen megabytes of noise.
+
+Two details that are easy to get wrong:
+
+- The manifest holds a `check` value — an HMAC of a fixed string under the MAC key — so a
+  wrong password is rejected in a few hundred milliseconds instead of after a fifteen
+  megabyte download fails its tag. It leaks nothing the encrypted files do not.
+- The loader is told `cacheControl: () => "no-store"`. Unity's own cache would otherwise
+  copy the decrypted build into IndexedDB, leaving the unlocked game on disk and making
+  the password a formality on the next visit.
+
+The password is never stored, so changing it means re-running the encrypt step and
+pushing; that also revokes it for everyone who had the old one. Web Crypto is only
+available in a secure context, so the page needs an `https://` or `localhost` address —
+opening `docs/index.html` from the filesystem will say so rather than fail obscurely.
 
 ## The art is not in this repository
 
@@ -65,8 +96,19 @@ on the reels, and the `no_frame` cut-outs are showcase pieces.
      -executeMethod EgyptianSlot.EditorTools.WebGlBuilder.Build
    ```
 
-   Output lands in `Build/WebGL` and the build exits non-zero on failure. Copy it to
-   `docs/Build/` to publish; `docs/index.html` is the hand-written page that loads it.
+   Output lands in `Build/WebGL` and the build exits non-zero on failure.
+
+5. **Publish.** Two scripts, from the repository root:
+
+   ```
+   powershell -File tools/encrypt-build.ps1
+   powershell -File tools/build-page.ps1
+   ```
+
+   The first prompts for the password twice and writes `docs/Build` — three `.enc` files,
+   `manifest.json`, and the Unity loader in clear. It takes a `-Password` argument too,
+   which is for testing: it puts the password in your shell history. The second wraps
+   `web/slot-demo.html` in a document skeleton and writes `docs/index.html`.
 
 ## Code layout
 
@@ -85,6 +127,8 @@ on the reels, and the `no_frame` cut-outs are showcase pieces.
 | `SlotSceneBuilder.cs` | Generates the scene and paytable from the catalogue. |
 | `TextureBudget.cs` | Caps import sizes for the web. |
 | `WebGlBuilder.cs` | Batch-mode WebGL build. |
+| `tools/encrypt-build.ps1` | Encrypts the build under a password. |
+| `tools/build-page.ps1` | Wraps the page fragment into `docs/index.html`. |
 
 ## How a reel works
 

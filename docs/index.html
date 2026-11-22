@@ -152,6 +152,46 @@
 
   .curtain p { margin: 0; color: var(--ink-dim); font-size: 0.9rem; }
 
+  /* The gate replaces the loading state rather than sitting on top of it: there is
+     nothing to load until it is answered. */
+  .gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    width: min(320px, 82%);
+  }
+
+  .gate input {
+    width: 100%;
+    padding: 11px 12px;
+    font: inherit;
+    font-size: 0.95rem;
+    text-align: center;
+    color: var(--ink);
+    background: var(--ground);
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+  }
+
+  .gate input:focus-visible { outline: none; border-color: var(--gold); }
+  .gate input:disabled { opacity: 0.5; }
+
+  .gate button {
+    font-family: var(--display);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    padding: 10px 26px;
+    color: var(--ground);
+    background: var(--gold);
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .gate button:disabled { opacity: 0.45; cursor: default; }
+
   .fullscreen,
   .sound {
     position: absolute;
@@ -348,9 +388,16 @@
   <div class="machine" id="machine">
     <canvas id="unity-canvas" width="1280" height="720" tabindex="0"></canvas>
     <div class="curtain" id="curtain">
+      <form class="gate" id="gate" hidden>
+        <label class="stage" for="password">Password required</label>
+        <input id="password" type="password" autocomplete="current-password"
+               spellcheck="false" placeholder="Password" aria-describedby="gate-note">
+        <button type="submit">Unlock</button>
+        <p id="gate-note">Shared privately. Ask whoever sent you the link.</p>
+      </form>
       <span class="stage" id="stage">Loading</span>
-      <div class="meter"><span id="bar"></span></div>
-      <p id="hint">About 18&nbsp;MB on first load, then cached.</p>
+      <div class="meter" id="meter"><span id="bar"></span></div>
+      <p id="hint">About 15&nbsp;MB once unlocked, then cached.</p>
     </div>
     <button class="fullscreen" id="fullscreen" type="button" title="Fullscreen"
             aria-label="Fullscreen" hidden>
@@ -441,95 +488,301 @@
 <script>
   (function () {
     var curtain = document.getElementById("curtain");
+    var gate = document.getElementById("gate");
+    var field = document.getElementById("password");
+    var note = document.getElementById("gate-note");
+    var unlock = gate.querySelector("button");
     var stage = document.getElementById("stage");
-    var hint = document.getElementById("hint");
+    var meter = document.getElementById("meter");
     var bar = document.getElementById("bar");
+    var hint = document.getElementById("hint");
 
+    // SVG elements have no `hidden` property — assigning one silently does nothing,
+    // so the attribute has to be set directly for the CSS [hidden] rule to bite.
     function setHidden(element, hide) {
       if (hide) element.setAttribute("hidden", "");
       else element.removeAttribute("hidden");
     }
 
+    function show(element) { setHidden(element, false); }
+    function hide(element) { setHidden(element, true); }
+
     function fail(message) {
+      hide(gate);
+      hide(meter);
+      show(stage);
+      show(hint);
       stage.textContent = "Could not start";
-      bar.parentNode.hidden = true;
       hint.className = "fail";
       hint.textContent = message;
     }
 
-    if (typeof createUnityInstance !== "function") {
-      fail("The Unity loader did not load, so the player could not start.");
+    // Decryption happens here, so the page needs Web Crypto, which browsers withhold
+    // outside a secure context. Opening the folder as a file:// URL will land here.
+    var subtle = window.crypto && window.crypto.subtle;
+    if (!subtle) {
+      fail("This browser will not provide Web Crypto on this page, so the build " +
+           "cannot be unlocked. It needs an https:// or localhost address.");
       return;
     }
 
-    createUnityInstance(document.getElementById("unity-canvas"), {
-      dataUrl: "Build/WebGL.data.unityweb",
-      frameworkUrl: "Build/WebGL.framework.js.unityweb",
-      codeUrl: "Build/WebGL.wasm.unityweb",
-      streamingAssetsUrl: "StreamingAssets",
-      companyName: "Egyptian Slot Demo",
-      productName: "Egyptian Slot",
-      productVersion: "1.0"
-    }, function (progress) {
-      bar.style.width = Math.round(progress * 100) + "%";
-      if (progress >= 1) stage.textContent = "Starting";
-    }).then(function (unityInstance) {
-      curtain.hidden = true;
-      document.getElementById("unity-canvas").focus();
+    function bytes(base64) {
+      var raw = atob(base64);
+      var out = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+      return out;
+    }
 
-      // Offered only once the player exists, and only where the browser will grant it:
-      // some embedded views refuse fullscreen outright, and a button that silently does
-      // nothing is worse than no button.
-      var sound = document.getElementById("sound");
-      var waves = document.getElementById("sound-waves");
-      var slash = document.getElementById("sound-slash");
-      var soundOn = false;
+    // Constant time, so a wrong password cannot be narrowed down by how long the
+    // comparison took.
+    function same(a, b) {
+      if (a.length !== b.length) return false;
+      var differing = 0;
+      for (var i = 0; i < a.length; i++) differing |= a[i] ^ b[i];
+      return differing === 0;
+    }
 
-      // The player starts silent: a page that makes noise before being asked is a
-      // nuisance, and browsers block audio until the page has been interacted with
-      // anyway, so the first press is both the permission and the switch.
-      sound.hidden = false;
-      sound.addEventListener("click", function () {
-        soundOn = !soundOn;
+    function utf8(text) { return new TextEncoder().encode(text); }
 
-        unityInstance.SendMessage("SlotMachine", "SetSoundEnabled", soundOn ? 1 : 0);
+    // One derivation split in two, matching tools/encrypt-build.ps1: the cipher key and
+    // the MAC key are independent.
+    function derive(password, manifest) {
+      var kdf = manifest.kdf;
 
-        sound.setAttribute("aria-pressed", String(soundOn));
-        sound.title = soundOn ? "Sound on" : "Sound off";
-        sound.setAttribute("aria-label", sound.title);
-        // SVG elements have no `hidden` property — assigning one silently does nothing,
-        // so the attribute has to be set directly for the CSS [hidden] rule to bite.
-        setHidden(waves, !soundOn);
-        setHidden(slash, soundOn);
+      return subtle.importKey("raw", utf8(password), "PBKDF2", false, ["deriveBits"])
+        .then(function (base) {
+          return subtle.deriveBits({
+            name: "PBKDF2",
+            salt: bytes(kdf.salt),
+            iterations: kdf.iterations,
+            hash: kdf.hash
+          }, base, 512);
+        })
+        .then(function (material) {
+          var all = new Uint8Array(material);
+          return Promise.all([
+            subtle.importKey("raw", all.slice(0, 32), { name: "AES-CBC" }, false, ["decrypt"]),
+            subtle.importKey("raw", all.slice(32), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+          ]);
+        })
+        .then(function (pair) { return { cipher: pair[0], mac: pair[1] }; });
+    }
+
+    function download(url, onBytes) {
+      return fetch(url).then(function (response) {
+        if (!response.ok) throw new Error(url + " returned " + response.status);
+        if (!response.body || !response.body.getReader) return response.arrayBuffer();
+
+        var reader = response.body.getReader();
+        var chunks = [];
+        var total = 0;
+
+        return (function pump() {
+          return reader.read().then(function (step) {
+            if (step.done) {
+              var joined = new Uint8Array(total);
+              var at = 0;
+              for (var i = 0; i < chunks.length; i++) {
+                joined.set(chunks[i], at);
+                at += chunks[i].length;
+              }
+              return joined.buffer;
+            }
+
+            chunks.push(step.value);
+            total += step.value.length;
+            onBytes(step.value.length);
+            return pump();
+          });
+        })();
       });
+    }
 
-      var button = document.getElementById("fullscreen");
-      if (!document.fullscreenEnabled) return;
+    // Layout is iv || ciphertext || tag, so the signed region is one slice and nothing
+    // has to be copied to check it.
+    function unseal(url, keys, onBytes) {
+      return download(url, onBytes).then(function (buffer) {
+        var all = new Uint8Array(buffer);
+        if (all.length < 48) throw new Error(url + " is too short to be a build file.");
 
-      button.hidden = false;
-      button.addEventListener("click", function () {
-        var machine = document.getElementById("machine");
+        var signed = all.subarray(0, all.length - 32);
+        var tag = all.subarray(all.length - 32);
 
-        if (document.fullscreenElement) {
-          document.exitFullscreen();
-          return;
-        }
-
-        // The container, not the canvas: Unity's own SetFullscreen promotes the canvas
-        // element alone, which leaves these controls outside the fullscreen subtree and
-        // therefore invisible exactly when they are most wanted.
-        var request = machine.requestFullscreen
-          ? machine.requestFullscreen()
-          : Promise.reject();
-
-        Promise.resolve(request).catch(function () {
-          // Some embedded views refuse a container; fall back to Unity's own path so
-          // the button still does something.
-          unityInstance.SetFullscreen(1);
+        return subtle.sign("HMAC", keys.mac, signed).then(function (expected) {
+          if (!same(new Uint8Array(expected), tag)) {
+            throw new Error(url + " does not match its signature.");
+          }
+          return subtle.decrypt(
+            { name: "AES-CBC", iv: all.subarray(0, 16) },
+            keys.cipher,
+            all.subarray(16, all.length - 32));
         });
       });
-    }).catch(function (message) {
-      fail(String(message));
+    }
+
+    function asUrl(buffer, type) {
+      return URL.createObjectURL(new Blob([buffer], { type: type }));
+    }
+
+    function boot(dataUrl, frameworkUrl, codeUrl) {
+      if (typeof createUnityInstance !== "function") {
+        throw new Error("The Unity loader did not load, so the player could not start.");
+      }
+
+      return createUnityInstance(document.getElementById("unity-canvas"), {
+        dataUrl: dataUrl,
+        frameworkUrl: frameworkUrl,
+        codeUrl: codeUrl,
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "Egyptian Slot Demo",
+        productName: "Egyptian Slot",
+        productVersion: "1.0",
+        // The build only ever exists decrypted in memory. Unity's own cache would copy
+        // it into IndexedDB, which would leave the unlocked game on disk after the tab
+        // closed and make the password a formality on the next visit.
+        cacheControl: function () { return "no-store"; }
+      }, function (progress) {
+        // The download already claimed the first seventy per cent of the bar.
+        bar.style.width = (70 + Math.round(progress * 30)) + "%";
+        if (progress >= 1) stage.textContent = "Starting";
+      }).then(function (unityInstance) {
+        URL.revokeObjectURL(dataUrl);
+        URL.revokeObjectURL(frameworkUrl);
+        URL.revokeObjectURL(codeUrl);
+
+        curtain.hidden = true;
+        document.getElementById("unity-canvas").focus();
+
+        // Offered only once the player exists, and only where the browser will grant it:
+        // some embedded views refuse fullscreen outright, and a button that silently does
+        // nothing is worse than no button.
+        var sound = document.getElementById("sound");
+        var waves = document.getElementById("sound-waves");
+        var slash = document.getElementById("sound-slash");
+        var soundOn = false;
+
+        // The player starts silent: a page that makes noise before being asked is a
+        // nuisance, and browsers block audio until the page has been interacted with
+        // anyway, so the first press is both the permission and the switch.
+        sound.hidden = false;
+        sound.addEventListener("click", function () {
+          soundOn = !soundOn;
+
+          unityInstance.SendMessage("SlotMachine", "SetSoundEnabled", soundOn ? 1 : 0);
+
+          sound.setAttribute("aria-pressed", String(soundOn));
+          sound.title = soundOn ? "Sound on" : "Sound off";
+          sound.setAttribute("aria-label", sound.title);
+          setHidden(waves, !soundOn);
+          setHidden(slash, soundOn);
+        });
+
+        var button = document.getElementById("fullscreen");
+        if (!document.fullscreenEnabled) return;
+
+        button.hidden = false;
+        button.addEventListener("click", function () {
+          var machine = document.getElementById("machine");
+
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+            return;
+          }
+
+          // The container, not the canvas: Unity's own SetFullscreen promotes the canvas
+          // element alone, which leaves these controls outside the fullscreen subtree and
+          // therefore invisible exactly when they are most wanted.
+          var request = machine.requestFullscreen
+            ? machine.requestFullscreen()
+            : Promise.reject();
+
+          Promise.resolve(request).catch(function () {
+            // Some embedded views refuse a container; fall back to Unity's own path so
+            // the button still does something.
+            unityInstance.SetFullscreen(1);
+          });
+        });
+      });
+    }
+
+    function load(manifest, keys) {
+      var files = manifest.files;
+      var total = files.data.bytes + files.framework.bytes + files.code.bytes;
+      var got = 0;
+
+      function onBytes(count) {
+        got += count;
+        bar.style.width = Math.min(70, Math.round((got / total) * 70)) + "%";
+      }
+
+      return Promise.all([
+        unseal("Build/" + files.data.path, keys, onBytes),
+        unseal("Build/" + files.framework.path, keys, onBytes),
+        unseal("Build/" + files.code.path, keys, onBytes)
+      ]).then(function (parts) {
+        stage.textContent = "Starting";
+        return boot(
+          asUrl(parts[0], "application/octet-stream"),
+          asUrl(parts[1], "application/javascript"),
+          asUrl(parts[2], "application/wasm"));
+      });
+    }
+
+    fetch("Build/manifest.json").then(function (response) {
+      if (!response.ok) throw new Error("manifest.json returned " + response.status);
+      return response.json();
+    }).then(function (manifest) {
+      hide(stage);
+      hide(meter);
+      hide(hint);
+      show(gate);
+      field.focus();
+
+      gate.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (!field.value) return;
+
+        unlock.disabled = true;
+        field.disabled = true;
+        note.className = "";
+        note.textContent = "Checking…";
+
+        derive(field.value, manifest).then(function (keys) {
+          // A short probe answers a wrong password in a few hundred milliseconds,
+          // rather than after fifteen megabytes have come down to fail their MAC.
+          return subtle.sign("HMAC", keys.mac, utf8("crowns-of-kemet"))
+            .then(function (proof) {
+              if (!same(new Uint8Array(proof), bytes(manifest.check))) {
+                var wrong = new Error("wrong password");
+                wrong.wrongPassword = true;
+                throw wrong;
+              }
+              return keys;
+            });
+        }).then(function (keys) {
+          hide(gate);
+          show(stage);
+          show(meter);
+          show(hint);
+          stage.textContent = "Unlocking";
+          return load(manifest, keys);
+        }).catch(function (error) {
+          unlock.disabled = false;
+          field.disabled = false;
+
+          if (error && error.wrongPassword) {
+            note.className = "fail";
+            note.textContent = "That password is not right.";
+            field.select();
+            field.focus();
+            return;
+          }
+
+          fail(String((error && error.message) || error));
+        });
+      });
+    }).catch(function (error) {
+      fail("The build could not be found: " + String((error && error.message) || error));
     });
   })();
 </script>
